@@ -31,7 +31,11 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- [ ] **I. Code Quality**: Static analysis tooling configured for this feature? Complexity budgets respected?
+- [ ] **II. Testing Standards**: Test strategy documented? Coverage targets (≥80%) specified per module?
+- [ ] **III. UX Consistency**: Design system referenced? Error message patterns defined and consistent?
+- [ ] **IV. Performance**: SLOs documented in spec? Benchmark strategy and baseline defined?
+- [ ] **Violations**: Any exceptions justified in the Complexity Tracking table below?
 
 ## Project Structure
 

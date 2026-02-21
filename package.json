@@ -1,0 +1,24 @@
+{
+  "name": "kasa",
+  "version": "0.1.0",
+  "description": "Application de gestion de dépenses",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "devDependencies": {
+    "@biomejs/biome": "^2.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "is-generator-function": "1.0.10"
+    }
+  },
+  "scripts": {
+    "check": "biome ci .",
+    "check:fix": "biome check --write .",
+    "typecheck": "pnpm -r --parallel run typecheck",
+    "test": "pnpm -r --parallel run test",
+    "test:watch": "pnpm -r --parallel run test:watch",
+    "build": "pnpm -r --parallel run build",
+    "dev": "pnpm -r --parallel run dev"
+  }
+}

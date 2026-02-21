@@ -1,0 +1,75 @@
+# kasa Development Guidelines
+
+Auto-generated from all feature plans. Last updated: 2026-02-21
+
+## Active Technologies
+
+- TypeScript 5.7 (strict) — Node.js 22 LTS (001-define-tech-stack)
+
+## Project Structure
+
+```text
+kasa/                        # repo root (pnpm monorepo) — github.com/zecaptus/kasa
+├── packages/
+│   └── db/                  # @kasa/db — Prisma partagé (types front + back)
+│       ├── prisma/schema.prisma  # source de vérité
+│       ├── src/client.ts    # PrismaClient singleton
+│       └── src/index.ts     # export { prisma } + types générés
+├── frontend/                # React 19 + Tailwind CSS 4 + Vite 6
+│   ├── src/
+│   │   ├── components/      # reusable UI components
+│   │   ├── pages/           # route-level components
+│   │   ├── hooks/           # custom React hooks
+│   │   ├── services/        # API client (typed fetch — types from @kasa/db)
+│   │   └── styles/globals.css
+│   └── tests/{unit,integration}/
+└── backend/                 # Koa 2 + PostgreSQL 16
+    ├── src/
+    │   ├── app.ts           # Koa app factory (export default app.callback() pour Vercel)
+    │   ├── index.ts         # server bootstrap (listen)
+    │   ├── config.ts        # env validation via zod
+    │   ├── routes/          # @koa/router handlers by domain
+    │   ├── middleware/      # error handler, logger, auth
+    │   └── services/        # business logic
+    └── tests/{unit,integration}/
+```
+
+## Commands
+
+```bash
+pnpm install          # install all workspace deps
+pnpm dev              # start frontend (5173) + backend (3000) in parallel
+pnpm check            # Biome lint + format check (entire repo)
+pnpm check:fix        # Biome auto-fix lint + format
+pnpm typecheck        # tsc --noEmit all packages
+pnpm test             # Vitest all packages with coverage
+pnpm build            # production build
+
+# Database (@kasa/db package)
+pnpm --filter @kasa/db run db:migrate   # apply migrations (dev)
+pnpm --filter @kasa/db run db:generate  # regenerate Prisma client
+```
+
+## Code Style
+
+- TypeScript strict mode everywhere — no `any`, explicit return types on public APIs
+- Biome — single tool for lint + format; `biome.json` at repo root; complexity ≤ 10; zero-issue policy
+- Tailwind CSS 4 — CSS-first, no `tailwind.config.js`
+- Vitest 3 — coverage ≥ 80% per module (v8 provider)
+
+## Recent Changes
+
+- 001-define-tech-stack: Monorepo scaffold implemented — check + typecheck + build all green
+
+<!-- MANUAL ADDITIONS START -->
+## Key Conventions
+
+- `backend/src/app.ts` exports the Koa app factory (no `listen`); `src/index.ts` calls `listen`.
+  This separation is required for supertest-based integration tests.
+- `backend/src/app.ts` also exports `app.callback()` as default for Vercel Functions.
+- All env vars are validated via zod at `backend/src/config.ts` startup — never access `process.env` directly elsewhere.
+- Prisma schema lives in `packages/db/prisma/schema.prisma`; migrations committed in `packages/db/prisma/migrations/`.
+- Frontend API calls go through `src/services/` — no raw `fetch` in components or hooks.
+- Frontend imports Prisma types via `import type { ... } from '@kasa/db'` — never imports `prisma` client.
+- Constitution lives at `.specify/memory/constitution.md` (v1.2.0) — 4 principles: Code Quality, Testing Standards, UX Consistency, Performance.
+<!-- MANUAL ADDITIONS END -->
