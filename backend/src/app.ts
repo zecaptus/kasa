@@ -14,7 +14,7 @@ function createApp(): Koa {
       const error = err instanceof Error ? err : new Error('Internal server error');
       ctx.status = (err as { status?: number }).status ?? 500;
       ctx.body = { error: error.message };
-      ctx.app.emit('error', err, ctx);
+      ctx.app.emit('error', error, ctx);
     }
   });
 

@@ -12,7 +12,7 @@ export default defineConfig({
         functions: 80,
         lines: 80,
       },
-      exclude: ['tests/**', '*.config.ts', 'src/index.ts'],
+      exclude: ['tests/**', '*.config.ts', 'src/index.ts', '**/dist/**'],
     },
   },
 });
