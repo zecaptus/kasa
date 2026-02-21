@@ -1,6 +1,6 @@
 {
   "name": "@kasa/backend",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "tsx watch --env-file=../.env src/index.ts",
