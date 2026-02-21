@@ -4,6 +4,11 @@
   "devDependencies": {
     "@biomejs/biome": "^2.0.0"
   },
+  "pnpm": {
+    "overrides": {
+      "is-generator-function": "1.0.10"
+    }
+  },
   "scripts": {
     "check": "biome ci .",
     "check:fix": "biome check --write .",
