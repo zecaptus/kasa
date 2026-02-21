@@ -14,6 +14,10 @@ build/
 # Vite build output
 **/dist/
 
+# Lock files from other package managers (project uses pnpm)
+package-lock.json
+yarn.lock
+
 # OS
 .DS_Store
 Thumbs.db
