@@ -1,0 +1,24 @@
+node_modules/
+dist/
+build/
+.env
+*.log
+*.local
+
+# Prisma generated client (regenerated via pnpm db:generate)
+**/generated/client/
+
+# Test coverage
+**/coverage/
+
+# Vite build output
+**/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+*.swo
+*.tmp

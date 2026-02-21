@@ -1,0 +1,16 @@
+{
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "devDependencies": {
+    "@biomejs/biome": "^2.0.0"
+  },
+  "scripts": {
+    "check": "biome ci .",
+    "check:fix": "biome check --write .",
+    "typecheck": "pnpm -r --parallel run typecheck",
+    "test": "pnpm -r --parallel run test",
+    "test:watch": "pnpm -r --parallel run test:watch",
+    "build": "pnpm -r --parallel run build",
+    "dev": "pnpm -r --parallel run dev"
+  }
+}
