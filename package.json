@@ -1,4 +1,7 @@
 {
+  "name": "kasa",
+  "version": "0.1.0",
+  "description": "Application de gestion de dépenses",
   "private": true,
   "packageManager": "pnpm@9.15.4",
   "devDependencies": {
