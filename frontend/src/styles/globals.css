@@ -1,5 +1,61 @@
+/* Importation de Tailwind v4 */
 @import "tailwindcss";
 
+/* Thème Kasa — Atelier Parisien */
 @theme {
-  /* Design tokens — à définir par feature */
+  /* Couleurs principales */
+  --color-kasa-primary: #4338ca;
+  --color-kasa-primary-hover: #3730a3;
+  --color-kasa-accent: #0d9488;
+  --color-kasa-accent-hover: #0f766e;
+
+  /* Structure et texte */
+  --color-kasa-dark: #1e293b;
+  --color-kasa-muted: #64748b;
+  --color-kasa-light: #f8fafc;
+  --color-kasa-surface: #ffffff;
+
+  /* Feedback financier */
+  --color-kasa-expense: #ef4444;
+  --color-kasa-income: #10b981;
+
+  /* Typographie */
+  --font-sans: "Figtree", system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+
+  /* Ombres */
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+/* Animations */
+@keyframes kasa-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes kasa-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes kasa-dash {
+  0% {
+    stroke-dasharray: 1, 150;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -35;
+  }
+  100% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -124;
+  }
 }

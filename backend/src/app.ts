@@ -1,10 +1,12 @@
 import bodyParser from '@koa/bodyparser';
 import Router from '@koa/router';
 import Koa, { type Context, type Next } from 'koa';
+import { accountRouter } from './routes/account.router';
+import { authRouter } from './routes/auth.router';
 
 function createApp(): Koa {
   const app = new Koa();
-  const router = new Router();
+  const healthRouter = new Router();
 
   // Error-handler middleware
   app.use(async (ctx: Context, next: Next) => {
@@ -22,12 +24,17 @@ function createApp(): Koa {
   app.use(bodyParser());
 
   // Health check
-  router.get('/api/health', (ctx: Context) => {
+  healthRouter.get('/api/health', (ctx: Context) => {
     ctx.body = { status: 'ok' };
   });
 
-  app.use(router.routes());
-  app.use(router.allowedMethods());
+  // Register routes
+  app.use(healthRouter.routes());
+  app.use(healthRouter.allowedMethods());
+  app.use(authRouter.routes());
+  app.use(authRouter.allowedMethods());
+  app.use(accountRouter.routes());
+  app.use(accountRouter.allowedMethods());
 
   return app;
 }

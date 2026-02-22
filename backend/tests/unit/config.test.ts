@@ -4,6 +4,7 @@ describe('config', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.stubEnv('DATABASE_URL', 'postgresql://localhost:5432/test');
+    vi.stubEnv('JWT_SECRET', 'test-secret-key-that-is-at-least-32-chars-long');
   });
 
   afterEach(() => {

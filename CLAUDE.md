@@ -5,6 +5,10 @@ Auto-generated from all feature plans. Last updated: 2026-02-21
 ## Active Technologies
 
 - TypeScript 5.7 (strict) — Node.js 22 LTS (001-define-tech-stack)
+- argon2 + jsonwebtoken — auth backend (002-user-management)
+- react-router v7 + async-mutex — frontend routing + reauth (002-user-management)
+- react-intl (FormatJS) + Redux Toolkit + RTK Query — i18n + state management (002-user-management)
+- RefreshToken model + enum Locale — Prisma schema (002-user-management)
 
 ## Project Structure
 
@@ -59,6 +63,7 @@ pnpm --filter @kasa/db run db:generate  # regenerate Prisma client
 
 ## Recent Changes
 
+- 002-user-management: Auth JWT httpOnly cookie implémentée — register, login, refresh rotation, logout, profil. Argon2id, RTK Query reauth (async-mutex), React Router v7 ProtectedRoute, react-intl i18n, password strength indicator
 - 001-define-tech-stack: Monorepo scaffold implemented — check + typecheck + build all green
 
 <!-- MANUAL ADDITIONS START -->

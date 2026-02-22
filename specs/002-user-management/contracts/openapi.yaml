@@ -1,0 +1,311 @@
+openapi: "3.1.0"
+
+info:
+  title: Kasa Auth & Account API
+  version: "1.0.0"
+  description: >
+    Authentication and account management endpoints for feature 002-user-management.
+    All session tokens are stored in httpOnly cookies — no Authorization header.
+
+servers:
+  - url: /api
+    description: Relative (proxied via Vite in dev, Vercel rewrite in prod)
+
+# ---------------------------------------------------------------------------
+# Shared components
+# ---------------------------------------------------------------------------
+components:
+  schemas:
+    UserDto:
+      type: object
+      required: [id, email, name, locale, createdAt]
+      properties:
+        id:
+          type: string
+          description: cuid() internal identifier
+          example: "clxyz123abc"
+        email:
+          type: string
+          format: email
+          example: "alice@example.com"
+        name:
+          type: string
+          example: "Alice Dupont"
+        locale:
+          type: string
+          enum: [FR, EN]
+          example: FR
+        createdAt:
+          type: string
+          format: date-time
+
+    ValidationError:
+      type: object
+      required: [error, details]
+      properties:
+        error:
+          type: string
+          example: "Validation failed"
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+    GenericError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+  responses:
+    Unauthorized:
+      description: No valid session cookie present or session expired
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GenericError"
+          example:
+            error: "Unauthorized"
+
+    UnprocessableEntity:
+      description: Request body failed validation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationError"
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+paths:
+
+  # ---------- Register ------------------------------------------------------
+  /auth/register:
+    post:
+      summary: Create a new account
+      operationId: register
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, name]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Normalized to lowercase before storage
+                  example: "alice@example.com"
+                password:
+                  type: string
+                  minLength: 8
+                  description: Plain text — hashed server-side (Argon2id). Never logged.
+                  example: "s3cr3tP@ss"
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                  example: "Alice Dupont"
+      responses:
+        "201":
+          description: Account created. Sets access_token + refresh_token httpOnly cookies.
+          headers:
+            Set-Cookie:
+              description: >
+                Two cookies set: `access_token` (Path=/, 15 min) and
+                `refresh_token` (Path=/api/auth/refresh, 7 days).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDto"
+        "409":
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericError"
+              example:
+                error: "Email already registered"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+  # ---------- Login ---------------------------------------------------------
+  /auth/login:
+    post:
+      summary: Authenticate with email and password
+      operationId: login
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "alice@example.com"
+                password:
+                  type: string
+                  example: "s3cr3tP@ss"
+      responses:
+        "200":
+          description: Authenticated. Sets access_token + refresh_token httpOnly cookies.
+          headers:
+            Set-Cookie:
+              description: Same as /auth/register
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDto"
+        "401":
+          description: Invalid credentials (generic — does not reveal which field is wrong)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericError"
+              example:
+                error: "Invalid credentials"
+        "429":
+          description: Account temporarily locked after 5 consecutive failures
+          headers:
+            Retry-After:
+              description: Seconds until the lockout expires
+              schema:
+                type: integer
+                example: 897
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericError"
+              example:
+                error: "Account temporarily locked. Try again later."
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+  # ---------- Logout --------------------------------------------------------
+  /auth/logout:
+    post:
+      summary: Invalidate the current session
+      operationId: logout
+      tags: [Auth]
+      security:
+        - cookieAuth: []
+      responses:
+        "204":
+          description: >
+            Session invalidated. Clears access_token and refresh_token cookies.
+            Other active sessions (other devices) are unaffected.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ---------- Refresh -------------------------------------------------------
+  /auth/refresh:
+    post:
+      summary: Rotate the refresh token and issue a new access token
+      operationId: refreshToken
+      tags: [Auth]
+      description: >
+        Reads the `refresh_token` cookie (Path=/api/auth/refresh).
+        Issues a new access_token + new refresh_token (token rotation).
+        If the presented token was already used (reuse detected), all sessions
+        for this token family are immediately invalidated.
+      responses:
+        "200":
+          description: Tokens rotated. Both httpOnly cookies updated.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDto"
+        "401":
+          description: Refresh token missing, expired, or already used (reuse detected)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericError"
+              example:
+                error: "Session expired. Please log in again."
+
+  # ---------- Me ------------------------------------------------------------
+  /auth/me:
+    get:
+      summary: Return the currently authenticated user
+      operationId: getMe
+      tags: [Auth]
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDto"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ---------- Profile -------------------------------------------------------
+  /account/profile:
+    patch:
+      summary: Update the authenticated user's profile
+      operationId: updateProfile
+      tags: [Account]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                  example: "Alice M. Dupont"
+                locale:
+                  type: string
+                  enum: [FR, EN]
+                  example: EN
+              description: At least one field required. Email is read-only in v1.
+      responses:
+        "200":
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserDto"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+# ---------------------------------------------------------------------------
+# Security scheme (documentation only — cookies sent automatically by browser)
+# ---------------------------------------------------------------------------
+securitySchemes:
+  cookieAuth:
+    type: apiKey
+    in: cookie
+    name: access_token
+    description: httpOnly session cookie set by /auth/login or /auth/register
