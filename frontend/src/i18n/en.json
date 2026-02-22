@@ -21,6 +21,7 @@
   "auth.login.errors.locked": "Account temporarily locked",
   "auth.login.errors.lockedRetry": "Too many attempts. Try again in {minutes} minutes.",
   "auth.logout.button": "Sign out",
+  "nav.home": "Home",
   "account.profile.title": "My profile",
   "account.profile.name": "Name",
   "account.profile.email": "Email",

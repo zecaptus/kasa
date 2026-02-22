@@ -21,6 +21,7 @@
   "auth.login.errors.locked": "Compte temporairement verrouillé",
   "auth.login.errors.lockedRetry": "Trop de tentatives. Réessayez dans {minutes} minutes.",
   "auth.logout.button": "Se déconnecter",
+  "nav.home": "Accueil",
   "account.profile.title": "Mon profil",
   "account.profile.name": "Nom",
   "account.profile.email": "Email",

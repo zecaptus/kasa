@@ -1,32 +1,44 @@
 /* Importation de Tailwind v4 */
 @import "tailwindcss";
 
-/* Configuration du thème Kasa */
+/* Thème Kasa — Atelier Parisien */
 @theme {
-  /* Couleurs principales basées sur le logo */
-  --color-kasa-primary: #4338ca; /* Indigo */
-  --color-kasa-primary-hover: #3730a3; /* Hover indigo */
-  --color-kasa-accent: #0d9488; /* Teal */
-  --color-kasa-accent-hover: #0f766e; /* Hover teal */
+  /* Couleurs principales */
+  --color-kasa-primary: #4338ca;
+  --color-kasa-primary-hover: #3730a3;
+  --color-kasa-accent: #0d9488;
+  --color-kasa-accent-hover: #0f766e;
 
-  /* Couleurs de structure et de texte */
-  --color-kasa-dark: #1e293b; /* Slate 800 */
-  --color-kasa-muted: #64748b; /* Slate 500 */
-  --color-kasa-light: #f8fafc; /* Slate 50 */
-  --color-kasa-surface: #ffffff; /* Blanc */
+  /* Structure et texte */
+  --color-kasa-dark: #1e293b;
+  --color-kasa-muted: #64748b;
+  --color-kasa-light: #f8fafc;
+  --color-kasa-surface: #ffffff;
 
   /* Feedback financier */
-  --color-kasa-expense: #ef4444; /* Rouge */
-  --color-kasa-income: #10b981; /* Vert */
+  --color-kasa-expense: #ef4444;
+  --color-kasa-income: #10b981;
 
   /* Typographie */
-  --font-sans: "Inter", system-ui, sans-serif;
+  --font-sans: "Figtree", system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
 
-  /* Ombres personnalisées */
+  /* Ombres */
   --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
 }
 
-/* Logo Kasa — spinner animations */
+/* Animations */
+@keyframes kasa-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes kasa-spin {
   to {
     transform: rotate(360deg);

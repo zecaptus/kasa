@@ -70,14 +70,14 @@ export function KasaLogo({ loading = false, className }: KasaLogoProps) {
         </g>
       </g>
 
-      {/* Texte "kasa." */}
+      {/* Wordmark "kasa." — serif display */}
       <text
         x="85"
-        y="55"
-        fontFamily="var(--font-sans)"
-        fontWeight="800"
-        fontSize="40"
-        letterSpacing="-1"
+        y="56"
+        fontFamily="var(--font-display)"
+        fontWeight="700"
+        fontSize="38"
+        letterSpacing="-0.5"
         className="fill-kasa-dark transition-colors duration-500 dark:fill-white"
       >
         kasa

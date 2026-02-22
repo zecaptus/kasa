@@ -8,7 +8,7 @@ export function ProtectedRoute() {
 
   if (!isInitialized) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
+      <div className="flex min-h-screen items-center justify-center bg-kasa-light dark:bg-slate-950">
         <KasaLogo loading className="h-16 w-auto" />
       </div>
     );
@@ -19,9 +19,9 @@ export function ProtectedRoute() {
   }
 
   return (
-    <>
+    <div className="min-h-screen bg-kasa-light dark:bg-slate-950">
       <NavBar />
       <Outlet />
-    </>
+    </div>
   );
 }

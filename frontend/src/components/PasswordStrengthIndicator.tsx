@@ -29,12 +29,12 @@ export function PasswordStrengthIndicator({ password }: PasswordStrengthIndicato
   if (password.length === 0) return null;
 
   return (
-    <div className="mt-1 space-y-1">
+    <div className="mt-1.5 space-y-1">
       <div className="flex gap-1">
         {segments.map((seg, i) => (
           <div
             key={seg.key}
-            className={cn('h-1 flex-1 rounded-full transition-colors duration-200', {
+            className={cn('h-1 flex-1 rounded-full transition-colors duration-300', {
               [segments[score].color]: i <= score,
               'bg-slate-200 dark:bg-slate-700': i > score,
             })}
