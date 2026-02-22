@@ -20,6 +20,7 @@ export default defineConfig({
         'tests/**',
         '*.config.ts',
         'src/index.ts',
+        'api/index.ts',
         '**/dist/**',
         'src/types/**',
         'src/services/**',
