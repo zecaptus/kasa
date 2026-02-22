@@ -14,6 +14,12 @@
 ### v1.2.0 (2026-02-21)
 - ESLint + Prettier replaced by Biome (single tool: lint + format, Rust-based, zero config split).
 
+### v1.3.0 (2026-02-22)
+- Product Vision section added: Kasa scope, core features (F1–F6), target user.
+- Principle V (Frontend Standards) added: mobile-first, mandatory i18n, clsx pattern, object syntax.
+- Stack table updated: react-intl, Redux Toolkit + RTK Query, clsx + tailwind-merge, vite-plugin-pwa,
+  Powens (TBD), OCR (TBD).
+
 ### Templates
 - `.specify/templates/plan-template.md` ✅ updated (Constitution Check gates filled)
 - `.specify/templates/spec-template.md` ⚠ no change required
@@ -22,6 +28,35 @@
 -->
 
 # Kasa Constitution
+
+## Product Vision
+
+Kasa is a **personal finance management web app** (PWA, mobile-first) for French individual users.
+
+### Target User
+
+A French individual with at least one Société Générale bank account who wants a clear,
+actionable view of their spending habits and savings goals.
+
+### Core Features
+
+| # | Feature | Description |
+|---|---|---|
+| F1 | User management | Email/password auth, profile, JWT sessions |
+| F2 | CSV Import | Import de relevés CSV Société Générale + saisie manuelle + rapprochement automatique |
+| F3 | Dashboard | Cards par compte affichant solde + transactions récentes ; indicateurs visuels |
+| F4 | Virtual pockets (cagnottes) | Sous-cartes imbriquées dans le Livret A — objectif d'épargne + indicateur de progression |
+| F5 | Receipt scan | OCR via caméra mobile → catégorisation automatique des postes de dépense |
+| F6 | PWA | Installable, mobile-first, offline-capable ; iOS Safari + Android Chrome |
+
+### Non-Functional Constraints
+
+- **UI language-agnostic** : toutes les chaînes visibles DOIVENT passer par react-intl ; aucune copie en dur.
+- **Mobile-first** : chaque layout est conçu pour ≤375 px en premier.
+- **Accessibility** : WCAG 2.1 AA pour tous les écrans.
+- **Privacy** : aucune credential bancaire brute stockée ; les fichiers CSV importés ne sont pas conservés après traitement.
+
+---
 
 ## Core Principles
 
@@ -63,8 +98,7 @@ All user-facing surfaces MUST deliver a coherent, predictable experience.
 - Error messages MUST be human-readable and actionable — no raw stack traces or error codes
   exposed to end users.
 - Navigation and information hierarchy MUST be consistent across all screens, pages, or commands.
-- Accessibility standards (WCAG 2.1 AA for web, or equivalent for CLI/native) MUST be met
-  for all new user-facing interfaces.
+- Accessibility standards (WCAG 2.1 AA for web) MUST be met for all new user-facing interfaces.
 - Breaking changes to user-facing behavior MUST be flagged in specs and reviewed before implementation.
 
 **Rationale**: UX consistency builds user trust and reduces support burden; violations erode perceived
@@ -86,6 +120,32 @@ Performance targets are constraints, not aspirations.
 **Rationale**: Performance requirements defined upfront prevent costly rewrites and ensure the product
 meets user expectations under real-world conditions.
 
+### V. Frontend Standards
+
+All frontend code MUST follow the conventions below to ensure consistency across components.
+
+- **Mobile-first layout** : CSS et structure des composants DOIVENT être conçus pour ≤375 px en premier ;
+  les breakpoints plus larges sont additifs. Les styles viewport-spécifiques DOIVENT utiliser les
+  préfixes responsive Tailwind (`sm:`, `md:`, `lg:`) en ordre croissant.
+- **i18n obligatoire** : toute chaîne visible par l'utilisateur DOIT être externalisée via `react-intl`
+  (`useIntl()` hook ou `<FormattedMessage />`). Les chaînes en dur dans JSX/TSX sont interdites.
+- **`clsx` pour les class names** : tous les class names Tailwind dynamiques ou conditionnels DOIVENT
+  être composés avec le helper `cn()` du projet (clsx + tailwind-merge). La concaténation manuelle
+  de chaînes pour les classes est interdite.
+- **Syntaxe objet pour les conditionnels** : les classes conditionnelles DOIVENT utiliser la notation objet :
+  `cn({ 'ring-2': isActive })` — les ternaires de classes (`isActive ? 'ring-2' : ''`) sont interdits.
+- **RTK Query pour les appels API** : toutes les requêtes serveur DOIVENT passer par des endpoints RTK Query
+  définis dans `src/services/` ; les composants consomment uniquement les hooks générés (`useGetXxxQuery`,
+  `useXxxMutation`). Aucun `fetch` brut ni appel direct dans les composants ou hooks custom.
+- **Redux Toolkit pour l'état client** : l'état global UI (auth, préférences, état de navigation) est géré
+  via des slices Redux Toolkit. Le cache serveur reste exclusivement dans RTK Query.
+
+**Rationale**: Mobile-first et i18n dès le jour 1 évitent des réécritures coûteuses. La séparation
+Redux (état client) / RTK Query (état serveur) maintient une architecture prévisible et auditable.
+Le helper `cn()` et la syntaxe objet rendent le styling conditionnel refactor-safe.
+
+---
+
 ## Technology & Stack Constraints
 
 Kasa is a **TypeScript monorepo** containing two independently buildable packages.
@@ -93,15 +153,22 @@ Kasa is a **TypeScript monorepo** containing two independently buildable package
 | Layer | Technology | Notes |
 |---|---|---|
 | Language | TypeScript (strict mode) | Both frontend and backend |
-| Runtime | Node.js (LTS) | Version pinned via `.nvmrc` or `.tool-versions` |
-| Frontend | React + Tailwind CSS | `frontend/` package |
-| Backend | Koa | `backend/` package — `app.callback()` pour Vercel |
-| ORM / DB access | Prisma (`@kasa/db`) | Package partagé — types consommés par front + back |
-| Database | PostgreSQL (default) | Amendable during planning if requirements differ |
-| Package manager | pnpm workspaces | Monorepo tooling; lock file committed |
-| Linter + Formatter | Biome | Single tool (lint + format); `biome ci` blocks CI; zero-issue policy |
+| Runtime | Node.js (LTS) | Version pinned via `.nvmrc` |
+| Frontend | React + Tailwind CSS 4 + Vite 6 | `frontend/` package |
+| i18n | react-intl (FormatJS) | Basé sur l'API native `Intl` — monnaie, dates, pluriels |
+| State (client) | Redux Toolkit | Slices pour auth, UI, préférences |
+| State (serveur) | RTK Query (inclus dans Redux Toolkit) | Endpoints déclaratifs, cache dans le store Redux |
+| Class utility | clsx + tailwind-merge (`cn()`) | Classes dynamiques/conditionnelles |
+| PWA | vite-plugin-pwa | Service worker, installable, mode offline |
+| Backend | Koa 2 + @koa/router | `backend/` package — `app.callback()` pour Vercel |
+| ORM / DB access | Prisma 6 (`@kasa/db`) | Package partagé — types consommés par front + back |
+| Database | PostgreSQL 16 | Amendable during planning if requirements differ |
+| CSV Import | Format CSV SG (natif) | Export depuis espace client SG — colonnes et encodage à confirmer en spec 003 |
+| OCR / Receipt scan | TBD | Évalué en spec 007 (Tesseract.js, Google Vision, AWS Textract…) |
+| Package manager | pnpm 9 workspaces | Monorepo tooling; lock file committed |
+| Linter + Formatter | Biome | Single tool; `biome ci` blocks CI; zero-issue policy |
 | Type checker | `tsc --noEmit` (strict) | Blocks CI on any error |
-| Testing | Vitest (unit + integration) | Coverage threshold ≥ 80% per module |
+| Testing | Vitest 3 (unit + integration) | Coverage threshold ≥ 80% per module |
 | CI | GitHub Actions | Runs check, typecheck, test on every push/PR |
 | Deployment | Vercel | Frontend SPA + Backend Koa handler |
 | Repository | GitHub | https://github.com/zecaptus/kasa.git |
@@ -109,6 +176,8 @@ Kasa is a **TypeScript monorepo** containing two independently buildable package
 **Stability rule**: The stack above MUST remain stable across features. Introducing a new
 technology requires a formal constitution amendment (PR → peer review → version bump)
 with a documented migration plan.
+
+---
 
 ## Development Workflow
 
@@ -134,4 +203,4 @@ This constitution supersedes all other project conventions. In case of conflict,
 - **Enforcement**: CI MUST enforce Code Quality and Testing Standards gates automatically.
   UX Consistency and Performance gates are verified during plan review and PR review.
 
-**Version**: 1.2.0 | **Ratified**: 2026-02-21 | **Last Amended**: 2026-02-21
+**Version**: 1.3.0 | **Ratified**: 2026-02-21 | **Last Amended**: 2026-02-22
