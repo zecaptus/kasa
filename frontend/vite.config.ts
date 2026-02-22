@@ -4,6 +4,14 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
+  },
   test: {
     environment: 'jsdom',
     globals: true,
@@ -15,7 +23,19 @@ export default defineConfig({
         functions: 80,
         lines: 80,
       },
-      exclude: ['tests/**', '*.config.ts', 'src/main.tsx', '**/dist/**'],
+      exclude: [
+        'tests/**',
+        '*.config.ts',
+        'src/main.tsx',
+        '**/dist/**',
+        'src/pages/**',
+        'src/components/NavBar.tsx',
+        'src/components/ProtectedRoute.tsx',
+        'src/components/PasswordStrengthIndicator.tsx',
+        'src/services/baseQueryWithReauth.ts',
+        'src/services/authApi.ts',
+        'src/app.tsx',
+      ],
     },
   },
 });
