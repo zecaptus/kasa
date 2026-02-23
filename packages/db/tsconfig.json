@@ -5,8 +5,10 @@
     "moduleResolution": "node",
     "module": "CommonJS",
     "types": ["node"],
-    "outDir": "./dist"
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist", "generated"]
+  "include": ["generated/client/index.d.ts"],
+  "exclude": ["node_modules"]
 }
