@@ -33,6 +33,18 @@ export function NavBar() {
         {user && (
           <div className="flex items-center gap-3">
             <Link
+              to="/import"
+              className="text-sm font-medium text-slate-600 transition-colors hover:text-kasa-accent dark:text-slate-400 dark:hover:text-kasa-accent"
+            >
+              {formatMessage({ id: 'nav.import' })}
+            </Link>
+            <Link
+              to="/transactions"
+              className="text-sm font-medium text-slate-600 transition-colors hover:text-kasa-accent dark:text-slate-400 dark:hover:text-kasa-accent"
+            >
+              {formatMessage({ id: 'nav.reconciliation' })}
+            </Link>
+            <Link
               to="/profil"
               className="text-sm font-medium text-slate-600 transition-colors hover:text-kasa-accent dark:text-slate-400 dark:hover:text-kasa-accent"
             >

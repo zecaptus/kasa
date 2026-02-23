@@ -3,6 +3,8 @@ import Router from '@koa/router';
 import Koa, { type Context, type Next } from 'koa';
 import { accountRouter } from './routes/account.router';
 import { authRouter } from './routes/auth.router';
+import expensesRouter from './routes/expenses.router';
+import importRouter from './routes/import.router';
 
 function createApp(): Koa {
   const app = new Koa();
@@ -35,6 +37,10 @@ function createApp(): Koa {
   app.use(authRouter.allowedMethods());
   app.use(accountRouter.routes());
   app.use(accountRouter.allowedMethods());
+  app.use(importRouter.routes());
+  app.use(importRouter.allowedMethods());
+  app.use(expensesRouter.routes());
+  app.use(expensesRouter.allowedMethods());
 
   return app;
 }

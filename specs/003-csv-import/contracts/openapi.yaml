@@ -1,0 +1,577 @@
+openapi: 3.1.0
+
+info:
+  title: Kasa — CSV Import & Reconciliation API
+  version: 1.0.0
+  description: |
+    Endpoints for Phase 2: CSV bank statement import, manual expense entry,
+    and automatic/manual transaction reconciliation.
+    All endpoints require a valid JWT session cookie (set by Phase 1 auth).
+
+servers:
+  - url: /api
+    description: Backend Koa server (proxied by Vite in dev, Vercel in prod)
+
+tags:
+  - name: import
+    description: CSV upload and import session management
+  - name: expenses
+    description: Manual expense CRUD
+  - name: reconciliation
+    description: Reconciliation confirmation and undo
+
+# ─────────────────────────────────────────────────────────────
+# PATHS
+# ─────────────────────────────────────────────────────────────
+
+paths:
+
+  # ── IMPORT ──────────────────────────────────────────────────
+
+  /import/csv:
+    post:
+      tags: [import]
+      summary: Upload and import a CSV bank statement
+      description: |
+        Accepts a multipart/form-data request with a single CSV file field named `file`.
+        The server:
+        1. Validates size (≤ 5 MB) and parses as SG CSV format.
+        2. Deduplicates against existing transactions for this user.
+        3. Persists new transactions under a new ImportSession.
+        4. Runs the reconciliation engine against all unreconciled ManualExpenses.
+        5. Returns the created session with a reconciliation summary.
+        The file itself is **not stored** after parsing.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: SG CSV export file (≤ 5 MB, Windows-1252 or UTF-8)
+      responses:
+        '201':
+          description: Import successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportSessionDetail'
+        '400':
+          description: Invalid file (format, size, or parse error)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                tooLarge:
+                  value: { error: 'FILE_TOO_LARGE', message: 'File exceeds 5 MB limit' }
+                invalidFormat:
+                  value: { error: 'INVALID_CSV_FORMAT', message: 'Could not detect SG CSV header row' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /import/sessions:
+    get:
+      tags: [import]
+      summary: List all import sessions for the authenticated user
+      description: Returns sessions newest-first. Does not include individual transactions.
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Pagination cursor (cuid of last seen session)
+      responses:
+        '200':
+          description: List of import sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessions, nextCursor]
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ImportSessionSummary'
+                  nextCursor:
+                    type: string
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /import/sessions/{sessionId}:
+    get:
+      tags: [import]
+      summary: Get a single import session with all its transactions
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session with transactions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportSessionDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── TRANSACTIONS (status update) ────────────────────────────
+
+  /import/transactions/{transactionId}:
+    patch:
+      tags: [import]
+      summary: Update the status of an imported transaction
+      description: |
+        Allows marking a transaction as IGNORED (to exclude from reconciliation)
+        or returning it to UNRECONCILED (un-ignore). Cannot set to RECONCILED via
+        this endpoint — use POST /reconciliation/confirm instead.
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [IGNORED, UNRECONCILED]
+      responses:
+        '200':
+          description: Updated transaction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportedTransaction'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── EXPENSES ────────────────────────────────────────────────
+
+  /expenses:
+    get:
+      tags: [expenses]
+      summary: List manual expenses for the authenticated user
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter expenses on or after this date (YYYY-MM-DD)
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter expenses on or before this date (YYYY-MM-DD)
+        - name: category
+          in: query
+          schema:
+            $ref: '#/components/schemas/ExpenseCategory'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [expenses, nextCursor]
+                properties:
+                  expenses:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ManualExpense'
+                  nextCursor:
+                    type: string
+                    nullable: true
+          description: List of manual expenses
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [expenses]
+      summary: Create a new manual expense
+      description: |
+        Saves the expense and immediately triggers the reconciliation engine
+        against all unreconciled imported transactions for this user.
+        Returns the created expense plus any reconciliation results produced.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualExpenseInput'
+      responses:
+        '201':
+          description: Expense created with reconciliation results
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [expense, reconciliationResults]
+                properties:
+                  expense:
+                    $ref: '#/components/schemas/ManualExpense'
+                  reconciliationResults:
+                    $ref: '#/components/schemas/ReconciliationResults'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /expenses/{expenseId}:
+    delete:
+      tags: [expenses]
+      summary: Delete a manual expense
+      description: |
+        Hard-deletes the expense. If it was linked to a reconciliation,
+        that reconciliation is deleted and the associated ImportedTransaction
+        is atomically reset to UNRECONCILED.
+      parameters:
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Expense deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── RECONCILIATION ──────────────────────────────────────────
+
+  /reconciliation/confirm:
+    post:
+      tags: [reconciliation]
+      summary: Confirm a reconciliation between a transaction and an expense
+      description: |
+        User explicitly selects a ManualExpense as the match for an ImportedTransaction.
+        Used for both ambiguous candidates (user picks from the list) and
+        manual overrides. Sets ImportedTransaction.status to RECONCILED.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [importedTransactionId, manualExpenseId]
+              properties:
+                importedTransactionId:
+                  type: string
+                manualExpenseId:
+                  type: string
+      responses:
+        '201':
+          description: Reconciliation confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reconciliation'
+        '400':
+          description: One or both items already reconciled, or belong to a different user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /reconciliation/{reconciliationId}:
+    delete:
+      tags: [reconciliation]
+      summary: Undo a reconciliation
+      description: |
+        Deletes the Reconciliation record and resets ImportedTransaction.status
+        to UNRECONCILED. The ManualExpense is also returned to unreconciled state.
+        Both updates occur in a single atomic transaction.
+      parameters:
+        - name: reconciliationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Reconciliation undone
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+# ─────────────────────────────────────────────────────────────
+# COMPONENTS
+# ─────────────────────────────────────────────────────────────
+
+components:
+
+  # ── SCHEMAS ─────────────────────────────────────────────────
+
+  schemas:
+
+    ReconciliationStatus:
+      type: string
+      enum: [UNRECONCILED, RECONCILED, IGNORED]
+
+    ExpenseCategory:
+      type: string
+      enum: [FOOD, TRANSPORT, HOUSING, HEALTH, ENTERTAINMENT, OTHER]
+
+    ImportSessionSummary:
+      type: object
+      required: [id, filename, importedAt, counts]
+      properties:
+        id:
+          type: string
+        filename:
+          type: string
+        importedAt:
+          type: string
+          format: date-time
+        counts:
+          $ref: '#/components/schemas/ReconciliationCounts'
+
+    ImportSessionDetail:
+      allOf:
+        - $ref: '#/components/schemas/ImportSessionSummary'
+        - type: object
+          required: [transactions]
+          properties:
+            transactions:
+              type: array
+              items:
+                $ref: '#/components/schemas/ImportedTransaction'
+
+    ImportedTransaction:
+      type: object
+      required: [id, sessionId, accountingDate, label, status]
+      properties:
+        id:
+          type: string
+        sessionId:
+          type: string
+        accountingDate:
+          type: string
+          format: date
+          description: DD/MM/YYYY stored as ISO date
+        valueDate:
+          type: string
+          format: date
+          nullable: true
+        label:
+          type: string
+        debit:
+          type: number
+          format: decimal
+          nullable: true
+          description: Positive amount (money leaving the account)
+        credit:
+          type: number
+          format: decimal
+          nullable: true
+          description: Positive amount (money entering the account)
+        status:
+          $ref: '#/components/schemas/ReconciliationStatus'
+        reconciliation:
+          $ref: '#/components/schemas/Reconciliation'
+          nullable: true
+        candidates:
+          type: array
+          description: Present only when status is UNRECONCILED and plausible matches exist
+          items:
+            $ref: '#/components/schemas/ReconciliationCandidate'
+
+    ManualExpenseInput:
+      type: object
+      required: [amount, label, date, category]
+      properties:
+        amount:
+          type: number
+          format: decimal
+          minimum: 0.01
+          description: Positive amount in euros
+        label:
+          type: string
+          minLength: 1
+          maxLength: 255
+        date:
+          type: string
+          format: date
+        category:
+          $ref: '#/components/schemas/ExpenseCategory'
+
+    ManualExpense:
+      allOf:
+        - $ref: '#/components/schemas/ManualExpenseInput'
+        - type: object
+          required: [id, createdAt]
+          properties:
+            id:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+            reconciliation:
+              $ref: '#/components/schemas/Reconciliation'
+              nullable: true
+
+    Reconciliation:
+      type: object
+      required: [id, importedTransactionId, manualExpenseId, confidenceScore, isAutoMatched, reconciledAt]
+      properties:
+        id:
+          type: string
+        importedTransactionId:
+          type: string
+        manualExpenseId:
+          type: string
+        confidenceScore:
+          type: number
+          minimum: 0
+          maximum: 1
+        isAutoMatched:
+          type: boolean
+        reconciledAt:
+          type: string
+          format: date-time
+
+    ReconciliationCandidate:
+      type: object
+      required: [expense, score, confidence]
+      properties:
+        expense:
+          $ref: '#/components/schemas/ManualExpense'
+        score:
+          type: number
+          minimum: 0
+          maximum: 1
+        confidence:
+          type: string
+          enum: [high, plausible, weak]
+
+    ReconciliationResults:
+      type: object
+      required: [autoReconciled, awaitingReview]
+      properties:
+        autoReconciled:
+          type: array
+          description: Transaction–expense pairs automatically matched (score ≥ 0.85, unique)
+          items:
+            $ref: '#/components/schemas/Reconciliation'
+        awaitingReview:
+          type: array
+          description: Transactions with multiple plausible matches needing user input
+          items:
+            $ref: '#/components/schemas/ImportedTransaction'
+
+    ReconciliationCounts:
+      type: object
+      required: [total, reconciled, awaitingReview, unreconciled, ignored]
+      properties:
+        total:
+          type: integer
+        reconciled:
+          type: integer
+        awaitingReview:
+          type: integer
+          description: Transactions with plausible candidates pending user confirmation
+        unreconciled:
+          type: integer
+        ignored:
+          type: integer
+
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code (SCREAMING_SNAKE_CASE)
+        message:
+          type: string
+          description: Human-readable description
+
+  # ── RESPONSES ───────────────────────────────────────────────
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid session
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: UNAUTHORIZED
+            message: Authentication required
+
+    NotFound:
+      description: Resource not found or does not belong to the authenticated user
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: NOT_FOUND
+            message: Resource not found
+
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  # ── SECURITY ────────────────────────────────────────────────
+
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+      description: httpOnly JWT access token set by POST /api/auth/login
+
+security:
+  - cookieAuth: []

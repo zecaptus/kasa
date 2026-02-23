@@ -34,6 +34,7 @@ export default defineConfig({
         'src/components/PasswordStrengthIndicator.tsx',
         'src/services/baseQueryWithReauth.ts',
         'src/services/authApi.ts',
+        'src/services/importApi.ts',
         'src/app.tsx',
       ],
     },

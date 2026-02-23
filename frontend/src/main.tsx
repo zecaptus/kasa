@@ -7,8 +7,10 @@ import { App } from './app';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import enMessages from './i18n/en.json';
 import frMessages from './i18n/fr.json';
+import { ImportPage } from './pages/ImportPage';
 import { LoginPage } from './pages/LoginPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { ReconciliationPage } from './pages/ReconciliationPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { store } from './store';
 import { useAppSelector } from './store/hooks';
@@ -47,6 +49,14 @@ const router = createBrowserRouter([
           {
             path: '/profil',
             Component: ProfilePage,
+          },
+          {
+            path: '/import',
+            Component: ImportPage,
+          },
+          {
+            path: '/transactions',
+            Component: ReconciliationPage,
           },
         ],
       },
