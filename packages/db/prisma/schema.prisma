@@ -19,13 +19,10 @@ enum ReconciliationStatus {
   IGNORED
 }
 
-enum ExpenseCategory {
-  FOOD
-  TRANSPORT
-  HOUSING
-  HEALTH
-  ENTERTAINMENT
-  OTHER
+enum CategorySource {
+  NONE
+  AUTO
+  MANUAL
 }
 
 model User {
@@ -38,10 +35,12 @@ model User {
   lockedUntil         DateTime?
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
-  refreshTokens       RefreshToken[]
+  refreshTokens        RefreshToken[]
   importSessions       ImportSession[]
   importedTransactions ImportedTransaction[]
   manualExpenses       ManualExpense[]
+  categories           Category[]
+  categoryRules        CategoryRule[]
 }
 
 model ImportSession {
@@ -67,31 +66,71 @@ model ImportedTransaction {
   debit          Decimal?             @db.Decimal(12, 2)
   credit         Decimal?             @db.Decimal(12, 2)
   status         ReconciliationStatus @default(UNRECONCILED)
+  categoryId     String?
+  categorySource CategorySource       @default(NONE)
   createdAt      DateTime             @default(now())
 
   session        ImportSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category       Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   reconciliation Reconciliation?
 
   @@unique([userId, accountingDate, label, debit, credit], name: "dedup_key")
   @@index([userId, status])
   @@index([sessionId])
+  @@index([categoryId])
 }
 
 model ManualExpense {
-  id        String          @id @default(cuid())
-  userId    String
-  amount    Decimal         @db.Decimal(12, 2)
-  label     String          @db.VarChar(255)
-  date      DateTime        @db.Date
-  category  ExpenseCategory
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  id             String         @id @default(cuid())
+  userId         String
+  amount         Decimal        @db.Decimal(12, 2)
+  label          String         @db.VarChar(255)
+  date           DateTime       @db.Date
+  categoryId     String?
+  categorySource CategorySource @default(NONE)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category       Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   reconciliation Reconciliation?
 
   @@index([userId, date])
+  @@index([categoryId])
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String
+  color     String   @default("#94a3b8")
+  isSystem  Boolean  @default(false)
+  userId    String?
+  createdAt DateTime @default(now())
+
+  user                 User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  manualExpenses       ManualExpense[]
+  importedTransactions ImportedTransaction[]
+  rules                CategoryRule[]
+
+  @@unique([slug, userId])
+  @@index([userId])
+}
+
+model CategoryRule {
+  id         String   @id @default(cuid())
+  userId     String?
+  keyword    String   @db.VarChar(100)
+  categoryId String
+  isSystem   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  user     User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isSystem])
 }
 
 model Reconciliation {

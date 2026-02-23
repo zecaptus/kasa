@@ -2,15 +2,13 @@ import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import { cn } from '../lib/cn';
 import { useCreateExpenseMutation } from '../services/importApi';
-
-const CATEGORIES = ['FOOD', 'TRANSPORT', 'HOUSING', 'HEALTH', 'ENTERTAINMENT', 'OTHER'] as const;
-type Category = (typeof CATEGORIES)[number];
+import { useListCategoriesQuery } from '../services/transactionsApi';
 
 interface FormValues {
   amount: string;
   label: string;
   date: string;
-  category: Category | '';
+  categoryId: string;
 }
 
 interface FormErrors {
@@ -23,11 +21,13 @@ interface FormErrors {
 export function ExpenseForm() {
   const intl = useIntl();
   const [createExpense, { isLoading }] = useCreateExpenseMutation();
+  const { data: categoriesData } = useListCategoriesQuery();
+  const categories = categoriesData?.categories ?? [];
   const [values, setValues] = useState<FormValues>({
     amount: '',
     label: '',
     date: new Date().toISOString().slice(0, 10),
-    category: '',
+    categoryId: '',
   });
   const [errors, setErrors] = useState<FormErrors>({});
 
@@ -43,7 +43,7 @@ export function ExpenseForm() {
     if (!values.date) {
       errs.date = intl.formatMessage({ id: 'expense.form.errors.date' });
     }
-    if (!values.category) {
+    if (!values.categoryId) {
       errs.category = intl.formatMessage({ id: 'expense.form.errors.category' });
     }
     return errs;
@@ -61,9 +61,14 @@ export function ExpenseForm() {
       amount: parseFloat(values.amount),
       label: values.label.trim(),
       date: values.date,
-      category: values.category as Category,
+      categoryId: values.categoryId,
     });
-    setValues({ amount: '', label: '', date: new Date().toISOString().slice(0, 10), category: '' });
+    setValues({
+      amount: '',
+      label: '',
+      date: new Date().toISOString().slice(0, 10),
+      categoryId: '',
+    });
   }
 
   function field(name: keyof FormValues) {
@@ -146,15 +151,15 @@ export function ExpenseForm() {
         <select
           id="expense-category"
           className={inputCls(errors.category)}
-          value={values.category}
-          onChange={(e) => setValues((v) => ({ ...v, category: e.target.value as Category | '' }))}
+          value={values.categoryId}
+          onChange={(e) => setValues((v) => ({ ...v, categoryId: e.target.value }))}
         >
           <option value="" disabled>
             —
           </option>
-          {CATEGORIES.map((cat) => (
-            <option key={cat} value={cat}>
-              {intl.formatMessage({ id: `expense.category.${cat}` })}
+          {categories.map((cat) => (
+            <option key={cat.id} value={cat.id}>
+              {cat.name}
             </option>
           ))}
         </select>

@@ -1,4 +1,3 @@
-import type { ExpenseCategory } from '@kasa/db';
 import Router from '@koa/router';
 import { requireAuth } from '../middleware/auth.js';
 import { createExpense, deleteExpense, listExpenses } from '../services/import.service.js';
@@ -16,15 +15,14 @@ router.get('/', async (ctx: Router.RouterContext) => {
   const cursor = typeof ctx.query.cursor === 'string' ? ctx.query.cursor : undefined;
   const from = typeof ctx.query.from === 'string' ? ctx.query.from : undefined;
   const to = typeof ctx.query.to === 'string' ? ctx.query.to : undefined;
-  const category =
-    typeof ctx.query.category === 'string' ? (ctx.query.category as ExpenseCategory) : undefined;
+  const categoryId = typeof ctx.query.categoryId === 'string' ? ctx.query.categoryId : undefined;
 
   const result = await listExpenses(userId, {
     limit,
     cursor: cursor ?? undefined,
     from: from ?? undefined,
     to: to ?? undefined,
-    category: category ?? undefined,
+    categoryId: categoryId ?? undefined,
   });
   ctx.body = result;
 });
@@ -36,20 +34,20 @@ router.post('/', async (ctx: Router.RouterContext) => {
     amount?: unknown;
     label?: unknown;
     date?: unknown;
-    category?: unknown;
+    categoryId?: unknown;
   };
 
   const amount = Number(body?.amount);
   const label = typeof body?.label === 'string' ? body.label.trim() : '';
   const date = typeof body?.date === 'string' ? body.date : '';
-  const category = body?.category as ExpenseCategory | undefined;
+  const categoryId = typeof body?.categoryId === 'string' ? body.categoryId : '';
 
   const errors: Record<string, string> = {};
   if (!amount || amount <= 0) errors.amount = 'amount must be a positive number';
   if (!label) errors.label = 'label is required';
   if (label.length > 255) errors.label = 'label must be 255 characters or fewer';
   if (!date) errors.date = 'date is required (YYYY-MM-DD)';
-  if (!category) errors.category = 'category is required';
+  if (!categoryId) errors.category = 'categoryId is required';
 
   if (Object.keys(errors).length > 0) {
     ctx.status = 400;
@@ -57,12 +55,7 @@ router.post('/', async (ctx: Router.RouterContext) => {
     return;
   }
 
-  const expense = await createExpense(userId, {
-    amount,
-    label,
-    date,
-    category: category as ExpenseCategory,
-  });
+  const expense = await createExpense(userId, { amount, label, date, categoryId });
 
   ctx.status = 201;
   ctx.body = { expense, reconciliationResults: { autoReconciled: [], awaitingReview: [] } };

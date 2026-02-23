@@ -1,0 +1,597 @@
+openapi: 3.1.0
+info:
+  title: Kasa Transactions API
+  version: 1.0.0
+  description: |
+    Unified transaction view, categorization, custom categories, and categorization rules.
+    All endpoints require JWT authentication (Bearer token or httpOnly cookie).
+
+servers:
+  - url: /api
+    description: Koa backend
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ─── Enums ──────────────────────────────────────────────────────────────────
+
+    ReconciliationStatus:
+      type: string
+      enum: [UNRECONCILED, RECONCILED, IGNORED]
+
+    CategorySource:
+      type: string
+      enum: [NONE, AUTO, MANUAL]
+      description: |
+        NONE = uncategorized, AUTO = auto-categorized (can be re-evaluated), MANUAL = user set (never overwritten)
+
+    TransactionType:
+      type: string
+      enum: [IMPORTED_TRANSACTION, MANUAL_EXPENSE]
+
+    # ─── Category ───────────────────────────────────────────────────────────────
+
+    Category:
+      type: object
+      required: [id, name, slug, color, isSystem, createdAt]
+      properties:
+        id:
+          type: string
+          description: cuid
+        name:
+          type: string
+          example: Alimentation
+        slug:
+          type: string
+          example: food
+          description: Stable lowercase key
+        color:
+          type: string
+          example: "#22c55e"
+        isSystem:
+          type: boolean
+          description: System categories cannot be deleted
+        userId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    # ─── CategoryRule ────────────────────────────────────────────────────────────
+
+    CategoryRule:
+      type: object
+      required: [id, keyword, categoryId, isSystem, createdAt]
+      properties:
+        id:
+          type: string
+        keyword:
+          type: string
+          maxLength: 100
+          example: CARREFOUR
+        categoryId:
+          type: string
+        isSystem:
+          type: boolean
+        userId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    # ─── Transaction (unified) ──────────────────────────────────────────────────
+
+    UnifiedTransaction:
+      type: object
+      required: [id, type, date, label, amount, categorySource]
+      properties:
+        id:
+          type: string
+        type:
+          $ref: '#/components/schemas/TransactionType'
+        date:
+          type: string
+          format: date
+          description: accountingDate for ImportedTransaction, date for ManualExpense
+        label:
+          type: string
+        detail:
+          type: string
+          nullable: true
+          description: Present only for ImportedTransaction (new SG format)
+        amount:
+          type: number
+          format: double
+          description: Always positive. Use direction to know if debit or credit.
+        direction:
+          type: string
+          enum: [debit, credit]
+          nullable: true
+          description: null for ManualExpense (always a debit/expense)
+        status:
+          $ref: '#/components/schemas/ReconciliationStatus'
+          nullable: true
+          description: null for ManualExpense
+        categoryId:
+          type: string
+          nullable: true
+        categorySource:
+          $ref: '#/components/schemas/CategorySource'
+        category:
+          $ref: '#/components/schemas/Category'
+          nullable: true
+
+    # ─── Pagination ─────────────────────────────────────────────────────────────
+
+    TimelineCursor:
+      type: string
+      description: Base64url-encoded opaque cursor { date, id }
+
+    # ─── Errors ─────────────────────────────────────────────────────────────────
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+paths:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # TRANSACTIONS (unified view)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /transactions:
+    get:
+      summary: List all transactions (unified view)
+      description: |
+        Returns a unified paginated list of ImportedTransaction and ManualExpense,
+        sorted by date descending. Uses keyset cursor pagination.
+      operationId: listTransactions
+      tags: [Transactions]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: cursor
+          in: query
+          schema:
+            $ref: '#/components/schemas/TimelineCursor'
+          description: Opaque cursor from previous page's nextCursor
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter transactions on or after this date (YYYY-MM-DD)
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Filter transactions on or before this date (YYYY-MM-DD)
+        - name: categoryId
+          in: query
+          schema:
+            type: string
+          description: Filter by category ID. Use "none" to filter uncategorized transactions.
+        - name: direction
+          in: query
+          schema:
+            type: string
+            enum: [debit, credit]
+          description: Filter by direction. Omit to return both.
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Full-text search on label and detail (case-insensitive)
+      responses:
+        '200':
+          description: Paginated list of unified transactions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [transactions, nextCursor, totals]
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UnifiedTransaction'
+                  nextCursor:
+                    $ref: '#/components/schemas/TimelineCursor'
+                    nullable: true
+                  totals:
+                    type: object
+                    description: Sum of amounts for the filtered result set (all pages combined)
+                    required: [debit, credit]
+                    properties:
+                      debit:
+                        type: number
+                      credit:
+                        type: number
+        '400':
+          description: Invalid cursor or query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+
+  /transactions/{id}:
+    get:
+      summary: Get transaction detail
+      description: Returns full detail for a single transaction (ImportedTransaction or ManualExpense).
+      operationId: getTransaction
+      tags: [Transactions]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Transaction detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedTransaction'
+        '404':
+          description: Transaction not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+
+  /transactions/{id}/category:
+    patch:
+      summary: Set or update the category of a transaction
+      description: |
+        Sets `categoryId` and `categorySource = MANUAL` on the transaction.
+        A MANUAL transaction is never overwritten by the auto-categorization engine.
+        Pass `categoryId: null` to unset the category (resets to NONE).
+      operationId: updateTransactionCategory
+      tags: [Transactions]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                categoryId:
+                  type: string
+                  nullable: true
+                  description: Category ID or null to unset
+      responses:
+        '200':
+          description: Updated transaction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedTransaction'
+        '404':
+          description: Transaction not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '400':
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # CATEGORIES
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /categories:
+    get:
+      summary: List all categories
+      description: Returns system categories and the user's custom categories.
+      operationId: listCategories
+      tags: [Categories]
+      responses:
+        '200':
+          description: All categories
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [categories]
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Category'
+        '401':
+          description: Unauthorized
+
+    post:
+      summary: Create a custom category
+      operationId: createCategory
+      tags: [Categories]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, color]
+              properties:
+                name:
+                  type: string
+                  maxLength: 50
+                  example: Sport
+                color:
+                  type: string
+                  pattern: '^#[0-9a-fA-F]{6}$'
+                  example: "#22c55e"
+      responses:
+        '201':
+          description: Created category
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '409':
+          description: A category with this name already exists for this user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+
+  /categories/{id}:
+    patch:
+      summary: Update a custom category
+      description: Only user-owned categories can be updated. System categories are immutable.
+      operationId: updateCategory
+      tags: [Categories]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 50
+                color:
+                  type: string
+                  pattern: '^#[0-9a-fA-F]{6}$'
+      responses:
+        '200':
+          description: Updated category
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '403':
+          description: Cannot modify a system category
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+
+    delete:
+      summary: Delete a custom category
+      description: |
+        Only user-owned categories can be deleted.
+        Transactions using this category will have their categoryId set to null (uncategorized).
+        Returns a count of affected transactions.
+      operationId: deleteCategory
+      tags: [Categories]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Category deleted, affected transaction count returned
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [affectedTransactions]
+                properties:
+                  affectedTransactions:
+                    type: integer
+                    description: Number of transactions whose category was reset to null
+        '403':
+          description: Cannot delete a system category
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # CATEGORIZATION RULES
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /categories/rules:
+    get:
+      summary: List categorization rules
+      description: Returns system rules and the user's custom rules, sorted by priority (user first).
+      operationId: listCategoryRules
+      tags: [Categories]
+      responses:
+        '200':
+          description: All rules
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rules]
+                properties:
+                  rules:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CategoryRule'
+        '401':
+          description: Unauthorized
+
+    post:
+      summary: Create a custom categorization rule
+      operationId: createCategoryRule
+      tags: [Categories]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [keyword, categoryId]
+              properties:
+                keyword:
+                  type: string
+                  maxLength: 100
+                  example: NETFLIX
+                categoryId:
+                  type: string
+      responses:
+        '201':
+          description: Created rule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryRule'
+        '404':
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+
+  /categories/rules/{id}:
+    patch:
+      summary: Update a custom categorization rule
+      operationId: updateCategoryRule
+      tags: [Categories]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                keyword:
+                  type: string
+                  maxLength: 100
+                categoryId:
+                  type: string
+      responses:
+        '200':
+          description: Updated rule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryRule'
+        '403':
+          description: Cannot modify a system rule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Rule not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+
+    delete:
+      summary: Delete a custom categorization rule
+      description: |
+        Only user-owned rules can be deleted.
+        Does NOT retroactively recategorize transactions already categorized by this rule.
+      operationId: deleteCategoryRule
+      tags: [Categories]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Rule deleted
+        '403':
+          description: Cannot delete a system rule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Rule not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized

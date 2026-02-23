@@ -1,5 +1,4 @@
 import {
-  type ExpenseCategory,
   type ImportedTransaction,
   type ImportSession,
   type ManualExpense,
@@ -7,6 +6,7 @@ import {
   prisma,
   type ReconciliationStatus,
 } from '@kasa/db';
+import { bulkCategorizeTransactions } from './categorization.service.js';
 import { parseSgCsv } from './csvParser.service.js';
 import { runReconciliation } from './reconciliation.service.js';
 
@@ -31,7 +31,7 @@ export interface CreateExpenseInput {
   label: string;
   /** ISO date string YYYY-MM-DD */
   date: string;
-  category: ExpenseCategory;
+  categoryId: string;
 }
 
 export interface ListExpensesOptions {
@@ -39,7 +39,7 @@ export interface ListExpensesOptions {
   cursor: string | undefined;
   from: string | undefined;
   to: string | undefined;
-  category: ExpenseCategory | undefined;
+  categoryId: string | undefined;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -111,6 +111,16 @@ export async function importCsv(
 
   // Trigger reconciliation after import (Q1: runs after every import)
   await runReconciliation(userId);
+
+  // Auto-categorize new transactions (skip MANUAL overrides)
+  await bulkCategorizeTransactions(
+    userId,
+    session.transactions.map((t) => ({
+      id: t.id,
+      label: t.label,
+      categorySource: t.categorySource,
+    })),
+  );
 
   const counts = computeCounts(session.transactions);
 
@@ -241,7 +251,8 @@ export async function createExpense(
       amount: new Prisma.Decimal(input.amount),
       label: input.label,
       date: new Date(input.date),
-      category: input.category,
+      categoryId: input.categoryId,
+      categorySource: 'MANUAL',
     },
   });
 
@@ -298,7 +309,7 @@ export async function listExpenses(
   const where: Prisma.ManualExpenseWhereInput = {
     userId,
     ...(dateFilter ? { date: dateFilter } : {}),
-    ...(options.category ? { category: options.category } : {}),
+    ...(options.categoryId ? { categoryId: options.categoryId } : {}),
   };
 
   const expenses = await prisma.manualExpense.findMany({
