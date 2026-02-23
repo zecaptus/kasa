@@ -34,6 +34,7 @@ export interface ImportedTransactionDto {
   accountingDate: string;
   valueDate: string | null;
   label: string;
+  detail: string | null;
   debit: number | null;
   credit: number | null;
   status: ReconciliationStatus;

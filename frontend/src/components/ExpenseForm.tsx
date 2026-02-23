@@ -75,19 +75,26 @@ export function ExpenseForm() {
   }
 
   const inputCls = (err?: string) =>
-    cn('w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors', {
-      'border-slate-300 focus:border-blue-400 focus:ring-1 focus:ring-blue-400': !err,
-      'border-red-400 focus:border-red-400 focus:ring-1 focus:ring-red-400': !!err,
-    });
+    cn(
+      'w-full rounded-xl border bg-white px-4 py-2.5 text-sm text-kasa-dark outline-none transition-all placeholder:text-slate-400 dark:bg-slate-900 dark:text-slate-100',
+      {
+        'border-slate-200 focus:border-kasa-accent focus:ring-2 focus:ring-kasa-accent/15 dark:border-slate-700':
+          !err,
+        'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-200': !!err,
+      },
+    );
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-4">
-      <h2 className="text-base font-medium text-slate-800">
+    <form onSubmit={handleSubmit} noValidate className="space-y-5">
+      <h2 className="text-center font-display text-2xl font-semibold tracking-tight text-kasa-dark dark:text-slate-100">
         {intl.formatMessage({ id: 'expense.form.title' })}
       </h2>
 
-      <div>
-        <label htmlFor="expense-amount" className="mb-1 block text-xs font-medium text-slate-600">
+      <div className="space-y-1.5">
+        <label
+          htmlFor="expense-amount"
+          className="block text-sm font-medium text-slate-600 dark:text-slate-400"
+        >
           {intl.formatMessage({ id: 'expense.form.amount' })}
         </label>
         <input
@@ -98,11 +105,14 @@ export function ExpenseForm() {
           className={inputCls(errors.amount)}
           {...field('amount')}
         />
-        {errors.amount && <p className="mt-1 text-xs text-red-600">{errors.amount}</p>}
+        {errors.amount && <p className="text-xs text-red-600 dark:text-red-400">{errors.amount}</p>}
       </div>
 
-      <div>
-        <label htmlFor="expense-label" className="mb-1 block text-xs font-medium text-slate-600">
+      <div className="space-y-1.5">
+        <label
+          htmlFor="expense-label"
+          className="block text-sm font-medium text-slate-600 dark:text-slate-400"
+        >
           {intl.formatMessage({ id: 'expense.form.label' })}
         </label>
         <input
@@ -112,19 +122,25 @@ export function ExpenseForm() {
           className={inputCls(errors.label)}
           {...field('label')}
         />
-        {errors.label && <p className="mt-1 text-xs text-red-600">{errors.label}</p>}
+        {errors.label && <p className="text-xs text-red-600 dark:text-red-400">{errors.label}</p>}
       </div>
 
-      <div>
-        <label htmlFor="expense-date" className="mb-1 block text-xs font-medium text-slate-600">
+      <div className="space-y-1.5">
+        <label
+          htmlFor="expense-date"
+          className="block text-sm font-medium text-slate-600 dark:text-slate-400"
+        >
           {intl.formatMessage({ id: 'expense.form.date' })}
         </label>
         <input id="expense-date" type="date" className={inputCls(errors.date)} {...field('date')} />
-        {errors.date && <p className="mt-1 text-xs text-red-600">{errors.date}</p>}
+        {errors.date && <p className="text-xs text-red-600 dark:text-red-400">{errors.date}</p>}
       </div>
 
-      <div>
-        <label htmlFor="expense-category" className="mb-1 block text-xs font-medium text-slate-600">
+      <div className="space-y-1.5">
+        <label
+          htmlFor="expense-category"
+          className="block text-sm font-medium text-slate-600 dark:text-slate-400"
+        >
           {intl.formatMessage({ id: 'expense.form.category' })}
         </label>
         <select
@@ -142,13 +158,15 @@ export function ExpenseForm() {
             </option>
           ))}
         </select>
-        {errors.category && <p className="mt-1 text-xs text-red-600">{errors.category}</p>}
+        {errors.category && (
+          <p className="text-xs text-red-600 dark:text-red-400">{errors.category}</p>
+        )}
       </div>
 
       <button
         type="submit"
         disabled={isLoading}
-        className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+        className="w-full rounded-xl bg-kasa-accent px-4 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-kasa-accent-hover hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
       >
         {intl.formatMessage({ id: 'expense.form.submit' })}
       </button>

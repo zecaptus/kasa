@@ -12,8 +12,16 @@ import { runReconciliation } from './reconciliation.service.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export interface ReconciliationCounts {
+  total: number;
+  reconciled: number;
+  awaitingReview: number;
+  unreconciled: number;
+  ignored: number;
+}
+
 export interface ImportCsvResult {
-  session: ImportSession & { transactions: ImportedTransaction[] };
+  session: ImportSession & { transactions: ImportedTransaction[]; counts: ReconciliationCounts };
   newCount: number;
   skippedCount: number;
 }
@@ -34,6 +42,18 @@ export interface ListExpensesOptions {
   category: ExpenseCategory | undefined;
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function computeCounts(transactions: ImportedTransaction[]): ReconciliationCounts {
+  return {
+    total: transactions.length,
+    reconciled: transactions.filter((t) => t.status === 'RECONCILED').length,
+    awaitingReview: 0, // Populated by reconciliation service when candidates exist
+    unreconciled: transactions.filter((t) => t.status === 'UNRECONCILED').length,
+    ignored: transactions.filter((t) => t.status === 'IGNORED').length,
+  };
+}
+
 // ─── importCsv ────────────────────────────────────────────────────────────────
 
 export async function importCsv(
@@ -49,6 +69,7 @@ export async function importCsv(
     accountingDate: tx.accountingDate,
     valueDate: tx.valueDate ?? null,
     label: tx.label,
+    detail: tx.detail ?? null,
     debit: tx.debit !== null ? new Prisma.Decimal(tx.debit) : null,
     credit: tx.credit !== null ? new Prisma.Decimal(tx.credit) : null,
     status: 'UNRECONCILED' as ReconciliationStatus,
@@ -91,8 +112,10 @@ export async function importCsv(
   // Trigger reconciliation after import (Q1: runs after every import)
   await runReconciliation(userId);
 
+  const counts = computeCounts(session.transactions);
+
   return {
-    session: { ...session.session, transactions: session.transactions },
+    session: { ...session.session, transactions: session.transactions, counts },
     newCount: session.newCount,
     skippedCount,
   };
@@ -113,10 +136,11 @@ export async function getSessionWithTransactions(
           isAutoMatched: boolean;
         } | null;
       })[];
+      counts: ReconciliationCounts;
     })
   | null
 > {
-  return prisma.importSession.findFirst({
+  const session = await prisma.importSession.findFirst({
     where: { id: sessionId, userId },
     include: {
       transactions: {
@@ -134,6 +158,11 @@ export async function getSessionWithTransactions(
       },
     },
   });
+
+  if (!session) return null;
+
+  const counts = computeCounts(session.transactions);
+  return { ...session, counts };
 }
 
 // ─── listSessions ─────────────────────────────────────────────────────────────
@@ -142,13 +171,7 @@ export interface SessionSummary {
   id: string;
   filename: string;
   importedAt: Date;
-  counts: {
-    total: number;
-    reconciled: number;
-    awaitingReview: number;
-    unreconciled: number;
-    ignored: number;
-  };
+  counts: ReconciliationCounts;
 }
 
 export async function listSessions(

@@ -63,6 +63,7 @@ model ImportedTransaction {
   accountingDate DateTime             @db.Date
   valueDate      DateTime?            @db.Date
   label          String
+  detail         String?
   debit          Decimal?             @db.Decimal(12, 2)
   credit         Decimal?             @db.Decimal(12, 2)
   status         ReconciliationStatus @default(UNRECONCILED)
