@@ -90,7 +90,7 @@ router.post('/', async (ctx: Router.RouterContext) => {
     typeof body.goalAmount === 'number' ? body.goalAmount : Number(body.goalAmount);
   const color = typeof body.color === 'string' ? body.color.trim() : '';
 
-  if (!accountLabel) {
+  if (typeof body.accountLabel !== 'string') {
     ctx.status = 400;
     ctx.body = { error: 'VALIDATION_ERROR', message: 'accountLabel is required' };
     return;

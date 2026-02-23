@@ -26,7 +26,9 @@ function validatePocketForm(
   if (!goalAmount || Number.isNaN(goal) || goal <= 0) {
     errs.goalAmount = formatMessage({ id: 'pockets.goal' });
   }
-  if (!accountLabel && !isEdit) errs.accountLabel = formatMessage({ id: 'pockets.account' });
+  // accountLabel can be "" (transactions imported before label feature) — only error when undefined
+  if (accountLabel === undefined && !isEdit)
+    errs.accountLabel = formatMessage({ id: 'pockets.account' });
   return errs;
 }
 
@@ -77,10 +79,11 @@ export function PocketForm({ initialValues, onSuccess, onCancel }: Props) {
     setErrors,
   } = usePocketFormState(initialValues, accounts);
 
-  // Auto-select first account once dashboard data loads (accounts is [] on initial render)
+  // Sync selection to first account once dashboard data loads (accounts is [] on first render)
+  // accountLabel may be "" which is falsy but is a valid value, so check accounts.length instead
   useEffect(() => {
-    if (!isEdit && !accountLabel && accounts[0]?.label) {
-      setAccountLabel(accounts[0].label);
+    if (!isEdit && accounts.length > 0 && accountLabel === '') {
+      setAccountLabel(accounts[0]?.label ?? '');
     }
   }, [accounts, accountLabel, isEdit, setAccountLabel]);
 
