@@ -35,6 +35,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
           <li key={tx.id} className="flex items-center gap-3 px-4 py-3">
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-slate-900">{tx.label}</p>
+              {tx.detail && <p className="truncate text-xs text-slate-500">{tx.detail}</p>}
               <p className="text-xs text-slate-400">
                 {intl.formatDate(tx.accountingDate, {
                   day: '2-digit',

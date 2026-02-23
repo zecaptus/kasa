@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import iconv from 'iconv-lite';
 import { describe, expect, it } from 'vitest';
 import { type ParsedTransaction, parseSgCsv } from '../../../src/services/csvParser.service.js';
 
@@ -106,6 +107,51 @@ describe('parseSgCsv', () => {
       const debit = result.find((t) => t.debit !== null);
       expect(credit?.credit).toBe(500);
       expect(debit?.debit).toBe(100);
+    });
+  });
+
+  describe("format 5 colonnes avec Date de l'opération", () => {
+    it('parse le format avec en-tête "Date de l\'opération"', async () => {
+      const content =
+        '="0105900051804855";01/02/2026;20/02/2026;35;18/02/2026;3,39 EUR\n' +
+        '\n' +
+        "Date de l'opération;Libellé;Détail de l'écriture;Montant de l'opération;Devise\n" +
+        '18/02/2026;CARTE X1306 17/02 ;CARTE X1306 17/02 ROMCOCO;-26,01;EUR\n' +
+        '17/02/2026;VIR RECU 960488198;VIR RECU 9604881985018 DE: M. STEEVE PITIS;50,00;EUR\n' +
+        '17/02/2026;PRELEVEMENT EUROPE;PRELEVEMENT EUROPEEN 4704545537;-26,00;EUR\n';
+      // Encode as Windows-1252 to simulate real SG file
+      const csv = iconv.encode(content, 'windows-1252');
+
+      const result = await parseSgCsv(csv);
+      expect(result).toHaveLength(3);
+
+      const debit = result[0];
+      expect(debit?.accountingDate).toEqual(new Date('2026-02-18'));
+      expect(debit?.label).toBe('CARTE X1306 17/02');
+      expect(debit?.detail).toBe('CARTE X1306 17/02 ROMCOCO');
+      expect(debit?.debit).toBe(26.01);
+      expect(debit?.credit).toBeNull();
+
+      const credit = result[1];
+      expect(credit?.label).toBe('VIR RECU 960488198');
+      expect(credit?.detail).toBe('VIR RECU 9604881985018 DE: M. STEEVE PITIS');
+      expect(credit?.credit).toBe(50);
+      expect(credit?.debit).toBeNull();
+    });
+
+    it('gère les formules Excel (=" ") en début de fichier', async () => {
+      const content =
+        '="0105900051804855";01/02/2026;20/02/2026;35;18/02/2026;3,39 EUR\n' +
+        '\n' +
+        "Date de l'opération;Libellé;Détail de l'écriture;Montant de l'opération;Devise\n" +
+        '18/02/2026;TEST;DETAIL;-10,00;EUR\n';
+      // Encode as Windows-1252
+      const csv = iconv.encode(content, 'windows-1252');
+
+      const result = await parseSgCsv(csv);
+      expect(result).toHaveLength(1);
+      expect(result[0]?.label).toBe('TEST');
+      expect(result[0]?.detail).toBe('DETAIL');
     });
   });
 });

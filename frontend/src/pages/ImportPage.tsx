@@ -72,15 +72,15 @@ export function ImportPage() {
               )}
             </p>
             {activeSession.newCount !== undefined && (
-              <div className="flex gap-2 text-xs">
-                <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-700">
+              <div className="flex gap-2 text-sm">
+                <span className="rounded-full bg-green-100 px-2.5 py-0.5 font-medium text-green-700">
                   {intl.formatMessage(
                     { id: 'import.session.new' },
                     { count: activeSession.newCount },
                   )}
                 </span>
                 {(activeSession.skippedCount ?? 0) > 0 && (
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">
+                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 font-medium text-slate-600">
                     {intl.formatMessage(
                       { id: 'import.session.skipped' },
                       { count: activeSession.skippedCount },
@@ -113,7 +113,7 @@ export function ImportPage() {
                   onClick={() => dispatch(setActiveSession(session.id))}
                 >
                   <span className="text-sm font-medium text-slate-800">{session.filename}</span>
-                  <span className="text-xs text-slate-400">
+                  <span className="text-sm text-slate-500">
                     {intl.formatDate(session.importedAt, {
                       day: '2-digit',
                       month: 'short',

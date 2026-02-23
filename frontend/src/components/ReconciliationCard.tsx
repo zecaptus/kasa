@@ -38,7 +38,8 @@ export function ReconciliationCard({ transaction: tx }: ReconciliationCardProps)
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-slate-900">{tx.label}</p>
-          <p className="mt-0.5 text-xs text-slate-400">
+          {tx.detail && <p className="mt-0.5 truncate text-xs text-slate-500">{tx.detail}</p>}
+          <p className="mt-0.5 text-sm text-slate-500">
             {intl.formatDate(tx.accountingDate, {
               day: '2-digit',
               month: 'short',
@@ -79,20 +80,20 @@ export function ReconciliationCard({ transaction: tx }: ReconciliationCardProps)
       {/* Candidates list (ambiguous matches) */}
       {tx.status === 'UNRECONCILED' && tx.candidates && tx.candidates.length > 0 && (
         <div className="mt-3">
-          <p className="mb-2 text-xs font-medium text-slate-500">
+          <p className="mb-2 text-sm font-semibold text-slate-600">
             {intl.formatMessage({ id: 'reconciliation.card.candidates.title' })}
           </p>
           <ul className="space-y-1">
             {tx.candidates.map((candidate) => (
               <li
                 key={candidate.expense.id}
-                className="flex items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2"
+                className="flex items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2.5"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-medium text-slate-800">
+                  <p className="truncate text-sm font-semibold text-slate-800">
                     {candidate.expense.label}
                   </p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-sm text-slate-500">
                     {intl.formatMessage({
                       id: `reconciliation.card.confidence.${candidate.confidence === 'high' ? 'high' : 'plausible'}`,
                     })}
@@ -102,7 +103,7 @@ export function ReconciliationCard({ transaction: tx }: ReconciliationCardProps)
                 </div>
                 <button
                   type="button"
-                  className="shrink-0 rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700"
+                  className="shrink-0 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
                   onClick={() =>
                     confirmReconciliation({
                       importedTransactionId: tx.id,
@@ -117,7 +118,7 @@ export function ReconciliationCard({ transaction: tx }: ReconciliationCardProps)
           </ul>
           <button
             type="button"
-            className="mt-2 text-xs text-slate-400 hover:text-slate-600"
+            className="mt-2 text-sm font-medium text-slate-500 hover:text-slate-700"
             onClick={() => updateStatus({ transactionId: tx.id, status: 'UNRECONCILED' })}
           >
             {intl.formatMessage({ id: 'reconciliation.card.candidates.dismiss' })}
@@ -130,7 +131,7 @@ export function ReconciliationCard({ transaction: tx }: ReconciliationCardProps)
         {tx.status === 'UNRECONCILED' && (
           <button
             type="button"
-            className="text-xs text-slate-400 hover:text-slate-600"
+            className="text-sm font-medium text-slate-500 hover:text-slate-700"
             onClick={() => updateStatus({ transactionId: tx.id, status: 'IGNORED' })}
           >
             {intl.formatMessage({ id: 'reconciliation.action.ignore' })}
@@ -139,7 +140,7 @@ export function ReconciliationCard({ transaction: tx }: ReconciliationCardProps)
         {tx.status === 'IGNORED' && (
           <button
             type="button"
-            className="text-xs text-slate-400 hover:text-slate-600"
+            className="text-sm font-medium text-slate-500 hover:text-slate-700"
             onClick={() => updateStatus({ transactionId: tx.id, status: 'UNRECONCILED' })}
           >
             {intl.formatMessage({ id: 'reconciliation.action.unignore' })}
@@ -152,7 +153,7 @@ export function ReconciliationCard({ transaction: tx }: ReconciliationCardProps)
             return (
               <button
                 type="button"
-                className="text-xs text-slate-400 hover:text-slate-600"
+                className="text-sm font-medium text-slate-500 hover:text-slate-700"
                 onClick={() => undoReconciliation(reconciliationId)}
               >
                 {intl.formatMessage({ id: 'reconciliation.action.undo' })}
