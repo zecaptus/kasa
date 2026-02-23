@@ -60,7 +60,7 @@ export interface ManualExpenseDto {
   amount: number;
   label: string;
   date: string;
-  category: string;
+  categoryId: string | null;
   createdAt: string;
   reconciliation: ReconciliationDto | null;
 }
@@ -74,7 +74,7 @@ export interface CreateExpenseRequest {
   amount: number;
   label: string;
   date: string;
-  category: string;
+  categoryId: string;
 }
 
 export interface SessionsResponse {

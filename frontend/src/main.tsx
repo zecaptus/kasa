@@ -7,11 +7,13 @@ import { App } from './app';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import enMessages from './i18n/en.json';
 import frMessages from './i18n/fr.json';
+import { CategoriesPage } from './pages/CategoriesPage';
 import { ImportPage } from './pages/ImportPage';
 import { LoginPage } from './pages/LoginPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { ReconciliationPage } from './pages/ReconciliationPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { TransactionsPage } from './pages/TransactionsPage';
 import { store } from './store';
 import { useAppSelector } from './store/hooks';
 import './styles/globals.css';
@@ -56,7 +58,15 @@ const router = createBrowserRouter([
           },
           {
             path: '/transactions',
+            Component: TransactionsPage,
+          },
+          {
+            path: '/rapprochement',
             Component: ReconciliationPage,
+          },
+          {
+            path: '/categories',
+            Component: CategoriesPage,
           },
         ],
       },

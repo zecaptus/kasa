@@ -36,7 +36,7 @@ export function ReconciliationPage() {
                       year: 'numeric',
                     })}
                     {' · '}
-                    {intl.formatMessage({ id: `expense.category.${expense.category}` })}
+                    {expense.categoryId ?? ''}
                   </p>
                 </div>
                 <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-800">

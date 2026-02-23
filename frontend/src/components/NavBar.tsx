@@ -42,7 +42,13 @@ export function NavBar() {
               to="/transactions"
               className="text-sm font-medium text-slate-600 transition-colors hover:text-kasa-accent dark:text-slate-400 dark:hover:text-kasa-accent"
             >
-              {formatMessage({ id: 'nav.reconciliation' })}
+              {formatMessage({ id: 'transactions.title' })}
+            </Link>
+            <Link
+              to="/categories"
+              className="text-sm font-medium text-slate-600 transition-colors hover:text-kasa-accent dark:text-slate-400 dark:hover:text-kasa-accent"
+            >
+              {formatMessage({ id: 'categories.title' })}
             </Link>
             <Link
               to="/profil"
