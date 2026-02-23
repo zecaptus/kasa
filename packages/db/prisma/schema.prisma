@@ -65,6 +65,7 @@ model ImportedTransaction {
   detail         String?
   debit          Decimal?             @db.Decimal(12, 2)
   credit         Decimal?             @db.Decimal(12, 2)
+  accountLabel   String               @default("")
   status         ReconciliationStatus @default(UNRECONCILED)
   categoryId     String?
   categorySource CategorySource       @default(NONE)

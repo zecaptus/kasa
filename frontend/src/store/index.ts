@@ -1,5 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { authApi } from '../services/authApi';
+import { dashboardApi } from '../services/dashboardApi';
 import { importApi } from '../services/importApi';
 import { transactionsApi } from '../services/transactionsApi';
 import authReducer from './authSlice';
@@ -14,12 +15,14 @@ export const store = configureStore({
     [authApi.reducerPath]: authApi.reducer,
     [importApi.reducerPath]: importApi.reducer,
     [transactionsApi.reducerPath]: transactionsApi.reducer,
+    [dashboardApi.reducerPath]: dashboardApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
       authApi.middleware,
       importApi.middleware,
       transactionsApi.middleware,
+      dashboardApi.middleware,
     ),
 });
 

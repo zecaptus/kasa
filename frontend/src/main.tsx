@@ -8,6 +8,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import enMessages from './i18n/en.json';
 import frMessages from './i18n/fr.json';
 import { CategoriesPage } from './pages/CategoriesPage';
+import { DashboardPage } from './pages/DashboardPage';
 import { ImportPage } from './pages/ImportPage';
 import { LoginPage } from './pages/LoginPage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -40,13 +41,7 @@ const router = createBrowserRouter([
         children: [
           {
             path: '/',
-            element: (
-              <div className="flex items-center justify-center px-4 py-20">
-                <h1 className="font-display text-2xl font-semibold text-kasa-dark dark:text-slate-100">
-                  Dashboard
-                </h1>
-              </div>
-            ),
+            Component: DashboardPage,
           },
           {
             path: '/profil',

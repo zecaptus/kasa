@@ -63,6 +63,23 @@ async function main(): Promise<void> {
     }
   }
 
+  // Update existing ImportedTransactions that have empty accountLabel
+  // to give them a representative label based on their session's filename.
+  // This ensures legacy data shows up under a named account on the dashboard.
+  const sessions = await prisma.importSession.findMany({
+    select: { id: true, filename: true },
+  });
+  for (const session of sessions) {
+    const derivedLabel = session.filename
+      .replace(/\.csv$/i, '')
+      .replace(/[_-]/g, ' ')
+      .trim();
+    await prisma.importedTransaction.updateMany({
+      where: { sessionId: session.id, accountLabel: '' },
+      data: { accountLabel: derivedLabel },
+    });
+  }
+
   console.log(
     `Seeded ${SYSTEM_CATEGORIES.length} system categories and ${SYSTEM_RULES.length} system rules.`,
   );

@@ -4,6 +4,7 @@ import Koa, { type Context, type Next } from 'koa';
 import { accountRouter } from './routes/account.router';
 import { authRouter } from './routes/auth.router';
 import categoriesRouter from './routes/categories.router';
+import dashboardRouter from './routes/dashboard.router';
 import expensesRouter from './routes/expenses.router';
 import importRouter from './routes/import.router';
 import transactionsRouter from './routes/transactions.router';
@@ -47,6 +48,8 @@ function createApp(): Koa {
   app.use(transactionsRouter.allowedMethods());
   app.use(categoriesRouter.routes());
   app.use(categoriesRouter.allowedMethods());
+  app.use(dashboardRouter.routes());
+  app.use(dashboardRouter.allowedMethods());
 
   return app;
 }

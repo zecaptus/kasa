@@ -1,0 +1,312 @@
+import { Prisma, prisma } from '@kasa/db';
+
+// ─── DTOs ─────────────────────────────────────────────────────────────────────
+
+export interface RecentTransactionDto {
+  id: string;
+  date: string; // YYYY-MM-DD
+  label: string;
+  amount: number;
+  direction: 'debit' | 'credit';
+}
+
+export interface AccountSummaryDto {
+  label: string;
+  balance: number;
+  monthlyVariation: number;
+  recentTransactions: RecentTransactionDto[];
+}
+
+export interface DashboardSummaryDto {
+  totalBalance: number;
+  monthlySpending: number;
+  monthlyIncome: number;
+  netCashFlow: number;
+}
+
+export interface CategorySpendingDto {
+  categoryId: string | null;
+  name: string;
+  slug: string;
+  color: string;
+  amount: number;
+}
+
+export interface CategoryComparisonDto {
+  currentMonth: CategorySpendingDto[];
+  previousMonth: CategorySpendingDto[];
+}
+
+export interface DashboardResponseDto {
+  summary: DashboardSummaryDto;
+  accounts: AccountSummaryDto[];
+  categoryComparison: CategoryComparisonDto;
+}
+
+// ─── Raw row types ─────────────────────────────────────────────────────────────
+
+interface GlobalSummaryRow {
+  total_balance: Prisma.Decimal | null;
+  monthly_spending_imported: Prisma.Decimal | null;
+  monthly_income: Prisma.Decimal | null;
+}
+
+interface MonthlyExpenseRow {
+  monthly_spending_manual: Prisma.Decimal | null;
+}
+
+interface AccountBalanceRow {
+  account_label: string;
+  balance: Prisma.Decimal | null;
+  monthly_variation: Prisma.Decimal | null;
+}
+
+interface RecentTxRow {
+  id: string;
+  date: Date;
+  label: string;
+  amount: Prisma.Decimal;
+  direction: string;
+  account_label: string;
+}
+
+interface CategorySpendingRow {
+  category_id: string | null;
+  cat_name: string | null;
+  cat_slug: string | null;
+  cat_color: string | null;
+  amount: Prisma.Decimal | null;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function toNum(d: Prisma.Decimal | null | undefined): number {
+  if (d == null) return 0;
+  return Number(d);
+}
+
+function currentMonthBounds(): { start: Date; end: Date } {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  return { start, end };
+}
+
+function prevMonthBounds(): { start: Date; end: Date } {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  return { start, end };
+}
+
+const OTHER_ENTRY: Omit<CategorySpendingDto, 'amount'> = {
+  categoryId: null,
+  name: 'other',
+  slug: 'other',
+  color: '#94a3b8',
+};
+
+const MAX_CHART_CATEGORIES = 9;
+
+function buildCategoryComparison(
+  current: CategorySpendingRow[],
+  previous: CategorySpendingRow[],
+): CategoryComparisonDto {
+  // Sort current by amount desc; take top MAX_CHART_CATEGORIES
+  const sortedCurrent = [...current].sort((a, b) => toNum(b.amount) - toNum(a.amount));
+  const top = sortedCurrent.slice(0, MAX_CHART_CATEGORIES);
+  const rest = sortedCurrent.slice(MAX_CHART_CATEGORIES);
+
+  const topIds = new Set(top.map((r) => r.category_id));
+
+  const toDto = (r: CategorySpendingRow): CategorySpendingDto => ({
+    categoryId: r.category_id,
+    name: r.cat_name ?? 'other',
+    slug: r.cat_slug ?? 'other',
+    color: r.cat_color ?? '#94a3b8',
+    amount: toNum(r.amount),
+  });
+
+  const currentMonth = top.map(toDto);
+  const otherCurrentAmount = rest.reduce((s, r) => s + toNum(r.amount), 0);
+
+  // Map previous month onto the same top slots
+  const prevMap = new Map<string | null, CategorySpendingRow>();
+  for (const r of previous) {
+    prevMap.set(r.category_id, r);
+  }
+
+  const previousMonth: CategorySpendingDto[] = top.map((topRow) => {
+    const prev = prevMap.get(topRow.category_id);
+    return {
+      categoryId: topRow.category_id,
+      name: topRow.cat_name ?? 'other',
+      slug: topRow.cat_slug ?? 'other',
+      color: topRow.cat_color ?? '#94a3b8',
+      amount: prev ? toNum(prev.amount) : 0,
+    };
+  });
+
+  // "Other" bucket aggregates everything outside top-9 from both months
+  const otherPreviousAmount = previous
+    .filter((r) => !topIds.has(r.category_id))
+    .reduce((s, r) => s + toNum(r.amount), 0);
+
+  if (rest.length > 0 || otherPreviousAmount > 0) {
+    currentMonth.push({ ...OTHER_ENTRY, amount: otherCurrentAmount });
+    previousMonth.push({ ...OTHER_ENTRY, amount: otherPreviousAmount });
+  }
+
+  return { currentMonth, previousMonth };
+}
+
+// ─── getGlobalSummary ─────────────────────────────────────────────────────────
+
+export async function getGlobalSummary(userId: string): Promise<DashboardSummaryDto> {
+  const { start, end } = currentMonthBounds();
+
+  const [summaryRows, manualRows] = await Promise.all([
+    prisma.$queryRaw<GlobalSummaryRow[]>(Prisma.sql`
+      SELECT
+        COALESCE(SUM(COALESCE("credit", 0) - COALESCE("debit", 0)), 0) AS total_balance,
+        COALESCE(SUM(CASE WHEN "accountingDate" >= ${start} AND "accountingDate" < ${end}
+                         THEN COALESCE("debit", 0) ELSE 0 END), 0)     AS monthly_spending_imported,
+        COALESCE(SUM(CASE WHEN "accountingDate" >= ${start} AND "accountingDate" < ${end}
+                         THEN COALESCE("credit", 0) ELSE 0 END), 0)    AS monthly_income
+      FROM "ImportedTransaction"
+      WHERE "userId" = ${userId}
+    `),
+    prisma.$queryRaw<MonthlyExpenseRow[]>(Prisma.sql`
+      SELECT COALESCE(SUM("amount"), 0) AS monthly_spending_manual
+      FROM "ManualExpense"
+      WHERE "userId" = ${userId}
+        AND "date" >= ${start}
+        AND "date" < ${end}
+    `),
+  ]);
+
+  const row = summaryRows[0];
+  const manualRow = manualRows[0];
+
+  const totalBalance = toNum(row?.total_balance);
+  const monthlyIncome = toNum(row?.monthly_income);
+  const monthlySpending =
+    toNum(row?.monthly_spending_imported) + toNum(manualRow?.monthly_spending_manual);
+  const netCashFlow = monthlyIncome - monthlySpending;
+
+  return { totalBalance, monthlySpending, monthlyIncome, netCashFlow };
+}
+
+// ─── getAccountSummaries ──────────────────────────────────────────────────────
+
+export async function getAccountSummaries(userId: string): Promise<AccountSummaryDto[]> {
+  const { start, end } = currentMonthBounds();
+
+  const [balanceRows, recentRows] = await Promise.all([
+    prisma.$queryRaw<AccountBalanceRow[]>(Prisma.sql`
+      SELECT
+        "accountLabel"                                                   AS account_label,
+        COALESCE(SUM(COALESCE("credit", 0) - COALESCE("debit", 0)), 0)  AS balance,
+        COALESCE(SUM(
+          CASE WHEN "accountingDate" >= ${start} AND "accountingDate" < ${end}
+               THEN COALESCE("credit", 0) - COALESCE("debit", 0) ELSE 0 END
+        ), 0)                                                            AS monthly_variation
+      FROM "ImportedTransaction"
+      WHERE "userId" = ${userId}
+      GROUP BY "accountLabel"
+      ORDER BY "accountLabel"
+    `),
+    prisma.$queryRaw<RecentTxRow[]>(Prisma.sql`
+      SELECT *
+      FROM (
+        SELECT
+          id,
+          "accountingDate"   AS date,
+          label,
+          COALESCE("debit", "credit", 0) AS amount,
+          CASE WHEN "debit" IS NOT NULL THEN 'debit' ELSE 'credit' END AS direction,
+          "accountLabel"     AS account_label,
+          ROW_NUMBER() OVER (PARTITION BY "accountLabel" ORDER BY "accountingDate" DESC, id ASC) AS rn
+        FROM "ImportedTransaction"
+        WHERE "userId" = ${userId}
+      ) ranked
+      WHERE rn <= 5
+      ORDER BY account_label, date DESC
+    `),
+  ]);
+
+  // Group recent rows by accountLabel
+  const recentByLabel = new Map<string, RecentTransactionDto[]>();
+  for (const r of recentRows) {
+    const list = recentByLabel.get(r.account_label) ?? [];
+    list.push({
+      id: r.id,
+      date: r.date.toISOString().split('T')[0] as string,
+      label: r.label,
+      amount: toNum(r.amount),
+      direction: r.direction as 'debit' | 'credit',
+    });
+    recentByLabel.set(r.account_label, list);
+  }
+
+  return balanceRows.map((row) => ({
+    label: row.account_label,
+    balance: toNum(row.balance),
+    monthlyVariation: toNum(row.monthly_variation),
+    recentTransactions: recentByLabel.get(row.account_label) ?? [],
+  }));
+}
+
+// ─── getCategoryComparison ────────────────────────────────────────────────────
+
+export async function getCategoryComparison(userId: string): Promise<CategoryComparisonDto> {
+  const curr = currentMonthBounds();
+  const prev = prevMonthBounds();
+
+  const queryCategorySpending = (start: Date, end: Date) =>
+    prisma.$queryRaw<CategorySpendingRow[]>(Prisma.sql`
+      SELECT
+        t.category_id,
+        c."name"   AS cat_name,
+        c."slug"   AS cat_slug,
+        c."color"  AS cat_color,
+        COALESCE(SUM(t.amount), 0) AS amount
+      FROM (
+        SELECT "categoryId" AS category_id, COALESCE("debit", 0) AS amount
+        FROM "ImportedTransaction"
+        WHERE "userId" = ${userId}
+          AND "accountingDate" >= ${start}
+          AND "accountingDate" < ${end}
+          AND "debit" IS NOT NULL
+
+        UNION ALL
+
+        SELECT "categoryId" AS category_id, "amount"
+        FROM "ManualExpense"
+        WHERE "userId" = ${userId}
+          AND "date" >= ${start}
+          AND "date" < ${end}
+      ) t
+      LEFT JOIN "Category" c ON c.id = t.category_id
+      GROUP BY t.category_id, c."name", c."slug", c."color"
+      ORDER BY amount DESC
+    `);
+
+  const [currentRows, previousRows] = await Promise.all([
+    queryCategorySpending(curr.start, curr.end),
+    queryCategorySpending(prev.start, prev.end),
+  ]);
+
+  return buildCategoryComparison(currentRows, previousRows);
+}
+
+// ─── getDashboard ─────────────────────────────────────────────────────────────
+
+export async function getDashboard(userId: string): Promise<DashboardResponseDto> {
+  const [summary, accounts, categoryComparison] = await Promise.all([
+    getGlobalSummary(userId),
+    getAccountSummaries(userId),
+    getCategoryComparison(userId),
+  ]);
+  return { summary, accounts, categoryComparison };
+}

@@ -7,6 +7,8 @@ Auto-generated from all feature plans. Last updated: 2026-02-23
 - csv-parse + iconv-lite + talisman + @koa/multer — CSV parsing, encoding, similarity matching, file upload (003-csv-import)
 - TypeScript 5.7 (strict mode), Node.js 22 LTS + Koa 2 + @koa/router (backend), React 19 + RTK Query (frontend), Prisma 6 + PostgreSQL 16 (004-transactions)
 - PostgreSQL 16 — 2 nouveaux modèles (`Category`, `CategoryRule`), 2 migrations (004-transactions)
+- TypeScript 5.7 (strict mode), Node.js 22 LTS + Recharts 2.x via shadcn chart wrapper (frontend), Koa 2 + @koa/router (backend), React 19 + RTK Query, Prisma 6 + PostgreSQL 16, react-intl (005-dashboard)
+- PostgreSQL 16 — 1 additive migration (new `account_label` column on `imported_transaction`) (005-dashboard)
 
 - TypeScript 5.7 (strict) — Node.js 22 LTS (001-define-tech-stack)
 - argon2 + jsonwebtoken — auth backend (002-user-management)
@@ -66,10 +68,10 @@ pnpm --filter @kasa/db run db:generate  # regenerate Prisma client
 - Vitest 3 — coverage ≥ 80% per module (v8 provider)
 
 ## Recent Changes
+- 005-dashboard: Added TypeScript 5.7 (strict mode), Node.js 22 LTS + Recharts 2.x via shadcn chart wrapper (frontend), Koa 2 + @koa/router (backend), React 19 + RTK Query, Prisma 6 + PostgreSQL 16, react-intl
 - 004-transactions: Added TypeScript 5.7 (strict mode), Node.js 22 LTS + Koa 2 + @koa/router (backend), React 19 + RTK Query (frontend), Prisma 6 + PostgreSQL 16
 - 003-csv-import: Added TypeScript 5.7 (strict) — Node.js 22 LTS
 
-- 002-user-management: Auth JWT httpOnly cookie implémentée — register, login, refresh rotation, logout, profil. Argon2id, RTK Query reauth (async-mutex), React Router v7 ProtectedRoute, react-intl i18n, password strength indicator
 
 <!-- MANUAL ADDITIONS START -->
 ## Key Conventions

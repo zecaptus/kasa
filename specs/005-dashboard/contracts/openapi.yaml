@@ -1,0 +1,312 @@
+openapi: 3.1.0
+
+info:
+  title: Kasa Dashboard API
+  version: 1.0.0
+  description: >
+    Dashboard endpoint returning aggregated financial data: global summary,
+    per-account cards, and category spending comparison for the current and
+    previous calendar months.
+
+servers:
+  - url: /api
+    description: Koa backend (local dev port 3000 / Vercel production)
+
+security:
+  - cookieAuth: []
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: kasa_access
+
+  schemas:
+
+    RecentTransaction:
+      type: object
+      required: [id, date, label, amount, direction]
+      properties:
+        id:
+          type: string
+          description: Transaction ID (cuid)
+          example: clxyz123
+        date:
+          type: string
+          format: date
+          description: Accounting date (YYYY-MM-DD)
+          example: "2026-02-15"
+        label:
+          type: string
+          description: Transaction label
+          example: "VIREMENT SALAIRE"
+        amount:
+          type: number
+          format: double
+          description: Absolute amount (always positive)
+          example: 2800.00
+        direction:
+          type: string
+          enum: [debit, credit]
+          description: debit = money out, credit = money in
+          example: credit
+
+    AccountSummary:
+      type: object
+      required: [label, balance, monthlyVariation, recentTransactions]
+      properties:
+        label:
+          type: string
+          description: >
+            Display name of the bank account. Empty string means no metadata
+            was available — the client SHOULD display a localised default
+            (e.g. "Compte principal").
+          example: "Compte courant"
+        balance:
+          type: number
+          format: double
+          description: All-time balance for this account (Sum(credit) − Sum(debit))
+          example: 1250.50
+        monthlyVariation:
+          type: number
+          format: double
+          description: >
+            Net balance change for the current calendar month
+            (Sum(credit) − Sum(debit) within the month). Negative = net outflow.
+          example: -320.00
+        recentTransactions:
+          type: array
+          maxItems: 5
+          items:
+            $ref: '#/components/schemas/RecentTransaction'
+          description: Up to 5 most recent transactions for this account, date DESC
+
+    DashboardSummary:
+      type: object
+      required: [totalBalance, monthlySpending, monthlyIncome, netCashFlow]
+      properties:
+        totalBalance:
+          type: number
+          format: double
+          description: >
+            Sum of all account balances across all ImportedTransactions
+            (Sum(credit) − Sum(debit), all time).
+          example: 4250.50
+        monthlySpending:
+          type: number
+          format: double
+          description: >
+            Total debits for the current calendar month across all
+            ImportedTransactions plus all ManualExpenses. Always ≥ 0.
+          example: 850.00
+        monthlyIncome:
+          type: number
+          format: double
+          description: >
+            Total credits for the current calendar month from
+            ImportedTransactions only. Always ≥ 0.
+          example: 2800.00
+        netCashFlow:
+          type: number
+          format: double
+          description: monthlyIncome − monthlySpending. Positive = net gain.
+          example: 1950.00
+
+    CategorySpending:
+      type: object
+      required: [categoryId, name, slug, color, amount]
+      properties:
+        categoryId:
+          type: [string, "null"]
+          description: Category ID (null = uncategorised transactions)
+          example: clcat456
+        name:
+          type: string
+          description: >
+            Category display name. For the synthetic "Other" bucket, value
+            is the literal string "other" — clients MUST localise it via
+            i18n key `dashboard.chart.other`.
+          example: "Alimentation"
+        slug:
+          type: string
+          description: Category slug (URL-safe identifier)
+          example: alimentation
+        color:
+          type: string
+          description: Hex colour for chart rendering
+          example: "#22c55e"
+        amount:
+          type: number
+          format: double
+          description: Total debit amount for this category in the given month. Always ≥ 0.
+          example: 340.50
+
+    CategoryComparison:
+      type: object
+      required: [currentMonth, previousMonth]
+      properties:
+        currentMonth:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategorySpending'
+          description: >
+            Up to 10 entries: top 9 spending categories + optional "Other"
+            bucket. Sorted by amount DESC.
+        previousMonth:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategorySpending'
+          description: >
+            Same category set as currentMonth. Categories absent in the
+            previous month appear with amount: 0. The "Other" bucket
+            aggregates all categories outside the top-9 for both months.
+
+    DashboardResponse:
+      type: object
+      required: [summary, accounts, categoryComparison]
+      properties:
+        summary:
+          $ref: '#/components/schemas/DashboardSummary'
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccountSummary'
+          description: >
+            One entry per distinct accountLabel found in ImportedTransactions.
+            Empty string accountLabel entries are consolidated into a single
+            "default account" entry. Empty array if no transactions exist.
+        categoryComparison:
+          $ref: '#/components/schemas/CategoryComparison'
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code
+          example: UNAUTHORIZED
+        message:
+          type: string
+          description: Human-readable detail (only in 4xx/5xx responses to authenticated requests)
+          example: Authentication required
+
+paths:
+
+  /dashboard:
+    get:
+      operationId: getDashboard
+      summary: Get full dashboard data
+      description: >
+        Returns the complete dashboard payload in a single request: global
+        financial summary, per-account balance cards (with recent transactions),
+        and the category spending comparison for the current and previous
+        calendar months.
+
+        All three aggregation queries (summary, accounts, category comparison)
+        are executed in parallel server-side. The response is computed fresh
+        on each request; the client is expected to cache it via RTK Query
+        (keepUnusedDataFor: 60 seconds).
+
+        **Calendar month**: computed from the server's UTC clock at request
+        time. "Current month" = year/month of `new Date()` UTC.
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Dashboard data successfully computed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardResponse'
+              examples:
+                withData:
+                  summary: User with two accounts and categorised transactions
+                  value:
+                    summary:
+                      totalBalance: 4250.50
+                      monthlySpending: 850.00
+                      monthlyIncome: 2800.00
+                      netCashFlow: 1950.00
+                    accounts:
+                      - label: "Compte courant"
+                        balance: 1250.50
+                        monthlyVariation: -320.00
+                        recentTransactions:
+                          - id: clxyz001
+                            date: "2026-02-20"
+                            label: "CB MONOPRIX"
+                            amount: 45.30
+                            direction: debit
+                          - id: clxyz002
+                            date: "2026-02-18"
+                            label: "VIREMENT SALAIRE"
+                            amount: 2800.00
+                            direction: credit
+                      - label: "Livret A"
+                        balance: 3000.00
+                        monthlyVariation: 0.00
+                        recentTransactions: []
+                    categoryComparison:
+                      currentMonth:
+                        - categoryId: clcat001
+                          name: "Alimentation"
+                          slug: alimentation
+                          color: "#22c55e"
+                          amount: 340.50
+                        - categoryId: clcat002
+                          name: "Transport"
+                          slug: transport
+                          color: "#3b82f6"
+                          amount: 210.00
+                        - categoryId: null
+                          name: "other"
+                          slug: other
+                          color: "#94a3b8"
+                          amount: 299.50
+                      previousMonth:
+                        - categoryId: clcat001
+                          name: "Alimentation"
+                          slug: alimentation
+                          color: "#22c55e"
+                          amount: 290.00
+                        - categoryId: clcat002
+                          name: "Transport"
+                          slug: transport
+                          color: "#3b82f6"
+                          amount: 185.00
+                        - categoryId: null
+                          name: "other"
+                          slug: other
+                          color: "#94a3b8"
+                          amount: 0.00
+                empty:
+                  summary: User with no transactions
+                  value:
+                    summary:
+                      totalBalance: 0
+                      monthlySpending: 0
+                      monthlyIncome: 0
+                      netCashFlow: 0
+                    accounts: []
+                    categoryComparison:
+                      currentMonth: []
+                      previousMonth: []
+        "401":
+          description: Not authenticated (missing or expired access token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: UNAUTHORIZED
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred

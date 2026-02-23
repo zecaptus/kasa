@@ -61,7 +61,7 @@ export async function importCsv(
   filename: string,
   buffer: Buffer,
 ): Promise<ImportCsvResult> {
-  const parsed = await parseSgCsv(buffer);
+  const parsed = await parseSgCsv(buffer, filename);
 
   // Build transaction create inputs
   const toInsert: Prisma.ImportedTransactionCreateManySessionInput[] = parsed.map((tx) => ({
@@ -72,6 +72,7 @@ export async function importCsv(
     detail: tx.detail ?? null,
     debit: tx.debit !== null ? new Prisma.Decimal(tx.debit) : null,
     credit: tx.credit !== null ? new Prisma.Decimal(tx.credit) : null,
+    accountLabel: tx.accountLabel,
     status: 'UNRECONCILED' as ReconciliationStatus,
   }));
 

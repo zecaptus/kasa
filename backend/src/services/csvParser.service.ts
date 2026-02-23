@@ -8,6 +8,7 @@ export interface ParsedTransaction {
   detail: string | null;
   debit: number | null;
   credit: number | null;
+  accountLabel: string;
 }
 
 type CsvFormat = '5col' | '4col' | '5col-operation';
@@ -74,7 +75,41 @@ function findHeaderRowIndex(rows: string[][], format: CsvFormat): number {
   return -1;
 }
 
-function parseRow5col(row: string[]): ParsedTransaction | null {
+/**
+ * Extracts a cell value from pre-header rows by key name.
+ */
+function findPreHeaderValue(rows: string[][], headerIdx: number, key: string): string {
+  for (let i = 0; i < headerIdx; i++) {
+    const row = rows[i];
+    if (!row || row.length < 2) continue;
+    if ((row[0]?.trim() ?? '') === key) return row[1]?.trim() ?? '';
+  }
+  return '';
+}
+
+/**
+ * Scans pre-header rows for SG account metadata.
+ * Prefers "Libellé du compte", falls back to "Numéro de compte".
+ */
+function extractAccountLabel(rows: string[][], headerIdx: number): string {
+  return (
+    findPreHeaderValue(rows, headerIdx, 'Libellé du compte') ||
+    findPreHeaderValue(rows, headerIdx, 'Numéro de compte')
+  );
+}
+
+/**
+ * Derives a display label from the uploaded filename.
+ * Strips .csv extension, replaces underscores and dashes with spaces.
+ */
+export function accountLabelFromFilename(filename: string): string {
+  return filename
+    .replace(/\.csv$/i, '')
+    .replace(/[_-]/g, ' ')
+    .trim();
+}
+
+function parseRow5col(row: string[], accountLabel: string): ParsedTransaction | null {
   const [dateStr, valueDateStr, label, debitRaw, creditRaw] = row;
   if (!dateStr || !label) return null;
   const accountingDate = parseDate(dateStr);
@@ -86,21 +121,22 @@ function parseRow5col(row: string[]): ParsedTransaction | null {
     detail: null,
     debit: parseAmount(debitRaw),
     credit: parseAmount(creditRaw),
+    accountLabel,
   };
 }
 
-function parse5col(rows: string[][], headerIdx: number): ParsedTransaction[] {
+function parse5col(rows: string[][], headerIdx: number, accountLabel: string): ParsedTransaction[] {
   const transactions: ParsedTransaction[] = [];
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i];
     if (!row || row.length !== 5) continue;
-    const tx = parseRow5col(row);
+    const tx = parseRow5col(row, accountLabel);
     if (tx) transactions.push(tx);
   }
   return transactions;
 }
 
-function parseRow4col(row: string[]): ParsedTransaction | null {
+function parseRow4col(row: string[], accountLabel: string): ParsedTransaction | null {
   const [dateStr, label, montantRaw] = row;
   if (!dateStr || !label) return null;
   const accountingDate = parseDate(dateStr);
@@ -113,21 +149,22 @@ function parseRow4col(row: string[]): ParsedTransaction | null {
     detail: null,
     debit: montant !== null && montant < 0 ? Math.abs(montant) : null,
     credit: montant !== null && montant > 0 ? montant : null,
+    accountLabel,
   };
 }
 
-function parse4col(rows: string[][], headerIdx: number): ParsedTransaction[] {
+function parse4col(rows: string[][], headerIdx: number, accountLabel: string): ParsedTransaction[] {
   const transactions: ParsedTransaction[] = [];
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i];
     if (!row || row.length !== 4) continue;
-    const tx = parseRow4col(row);
+    const tx = parseRow4col(row, accountLabel);
     if (tx) transactions.push(tx);
   }
   return transactions;
 }
 
-function parseRow5colOperation(row: string[]): ParsedTransaction | null {
+function parseRow5colOperation(row: string[], accountLabel: string): ParsedTransaction | null {
   // Format: Date de l'opération, Libellé, Détail de l'écriture, Montant, Devise
   const [dateStr, label, detail, montantRaw, _devise] = row;
   if (!dateStr || !label) return null;
@@ -142,21 +179,26 @@ function parseRow5colOperation(row: string[]): ParsedTransaction | null {
     detail: detail?.trim() || null,
     debit: montant !== null && montant < 0 ? Math.abs(montant) : null,
     credit: montant !== null && montant > 0 ? montant : null,
+    accountLabel,
   };
 }
 
-function parse5colOperation(rows: string[][], headerIdx: number): ParsedTransaction[] {
+function parse5colOperation(
+  rows: string[][],
+  headerIdx: number,
+  accountLabel: string,
+): ParsedTransaction[] {
   const transactions: ParsedTransaction[] = [];
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i];
     if (!row || row.length !== 5) continue;
-    const tx = parseRow5colOperation(row);
+    const tx = parseRow5colOperation(row, accountLabel);
     if (tx) transactions.push(tx);
   }
   return transactions;
 }
 
-export async function parseSgCsv(buffer: Buffer): Promise<ParsedTransaction[]> {
+export async function parseSgCsv(buffer: Buffer, filename?: string): Promise<ParsedTransaction[]> {
   if (buffer.length === 0) {
     throw new Error('INVALID_CSV_FORMAT');
   }
@@ -184,11 +226,14 @@ export async function parseSgCsv(buffer: Buffer): Promise<ParsedTransaction[]> {
     throw new Error('INVALID_CSV_FORMAT');
   }
 
+  const accountLabel =
+    extractAccountLabel(rows, headerIdx) || (filename ? accountLabelFromFilename(filename) : '');
+
   if (format === '5col') {
-    return parse5col(rows, headerIdx);
+    return parse5col(rows, headerIdx, accountLabel);
   }
   if (format === '5col-operation') {
-    return parse5colOperation(rows, headerIdx);
+    return parse5colOperation(rows, headerIdx, accountLabel);
   }
-  return parse4col(rows, headerIdx);
+  return parse4col(rows, headerIdx, accountLabel);
 }
