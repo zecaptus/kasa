@@ -76,6 +76,8 @@ pnpm --filter @kasa/db run db:generate  # regenerate Prisma client
 <!-- MANUAL ADDITIONS START -->
 ## Key Conventions
 
+- **Avant chaque commit** : toujours lancer `pnpm check` et corriger les erreurs Biome avant de committer.
+
 - `backend/src/app.ts` exports the Koa app factory (no `listen`); `src/index.ts` calls `listen`.
   This separation is required for supertest-based integration tests.
 - `backend/src/app.ts` also exports `app.callback()` as default for Vercel Functions.
