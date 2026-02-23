@@ -55,7 +55,7 @@ export async function importCsv(
   }));
 
   // Create session and attempt to insert transactions, skipping duplicates
-  const session = await prisma.$transaction(async (tx) => {
+  const session = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const created = await tx.importSession.create({
       data: { userId, filename },
     });
@@ -237,7 +237,7 @@ export async function deleteExpense(userId: string, expenseId: string): Promise<
   });
   if (!expense) return false;
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     // If linked to a reconciliation, reset the ImportedTransaction status first
     if (expense.reconciliation) {
       await tx.importedTransaction.update({

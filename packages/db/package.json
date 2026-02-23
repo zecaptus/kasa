@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "main": "./src/index.js",
-  "types": "./generated/client/index.d.ts",
+  "types": "./src/index.d.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "prisma generate && tsc",

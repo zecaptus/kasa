@@ -165,7 +165,7 @@ export async function confirmReconciliation(
 
   const match = matchBankLabel(tx.label, expense.label);
 
-  const result = await prisma.$transaction(async (trx) => {
+  const result = await prisma.$transaction(async (trx: Prisma.TransactionClient) => {
     const reconciliation = await trx.reconciliation.create({
       data: {
         importedTransactionId,
