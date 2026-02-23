@@ -1,9 +1,12 @@
 import { useIntl } from 'react-intl';
 import { cn } from '../lib/cn';
 import type { AccountSummaryDto } from '../services/dashboardApi';
+import type { PocketSummaryDto } from '../services/pocketsApi';
+import { PocketCard } from './PocketCard';
 
 interface Props {
   account: AccountSummaryDto;
+  pockets?: PocketSummaryDto[] | undefined;
 }
 
 function VariationBadge({ value }: { value: number }) {
@@ -43,7 +46,7 @@ function VariationBadge({ value }: { value: number }) {
   );
 }
 
-export function AccountCard({ account }: Props) {
+export function AccountCard({ account, pockets }: Props) {
   const intl = useIntl();
 
   const displayLabel =
@@ -113,6 +116,15 @@ export function AccountCard({ account }: Props) {
           </ul>
         )}
       </div>
+
+      {/* Nested pocket cards */}
+      {pockets && pockets.length > 0 && (
+        <div className="mt-4 space-y-2">
+          {pockets.map((pocket) => (
+            <PocketCard key={pocket.id} pocket={pocket} compact />
+          ))}
+        </div>
+      )}
     </article>
   );
 }

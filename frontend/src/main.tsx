@@ -11,6 +11,7 @@ import { CategoriesPage } from './pages/CategoriesPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ImportPage } from './pages/ImportPage';
 import { LoginPage } from './pages/LoginPage';
+import { PocketsPage } from './pages/PocketsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { ReconciliationPage } from './pages/ReconciliationPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -62,6 +63,10 @@ const router = createBrowserRouter([
           {
             path: '/categories',
             Component: CategoriesPage,
+          },
+          {
+            path: '/cagnottes',
+            Component: PocketsPage,
           },
         ],
       },

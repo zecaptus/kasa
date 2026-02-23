@@ -1,0 +1,402 @@
+openapi: 3.1.0
+
+info:
+  title: Kasa Pockets API
+  version: 1.0.0
+  description: >
+    Virtual savings pockets — create, manage, and track goal-based sub-allocations
+    of any bank account balance.
+
+servers:
+  - url: /api
+    description: Koa backend
+
+security:
+  - cookieAuth: []
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: kasa_access
+
+  schemas:
+
+    PocketSummary:
+      type: object
+      required: [id, accountLabel, name, goalAmount, allocatedAmount, progressPct, color, createdAt]
+      properties:
+        id:
+          type: string
+          example: clpkt001
+        accountLabel:
+          type: string
+          description: Matches ImportedTransaction.accountLabel for the linked account
+          example: "Livret A"
+        name:
+          type: string
+          example: "Vacances été"
+        goalAmount:
+          type: number
+          format: double
+          example: 2000.00
+        allocatedAmount:
+          type: number
+          format: double
+          description: Derived — SUM(ALLOCATION) - SUM(WITHDRAWAL). Always >= 0.
+          example: 850.00
+        progressPct:
+          type: number
+          format: double
+          description: min(allocatedAmount / goalAmount * 100, 100). Range 0–100.
+          example: 42.5
+        color:
+          type: string
+          description: Hex colour from the predefined palette
+          example: "#3b82f6"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-02-23T10:00:00.000Z"
+
+    PocketMovement:
+      type: object
+      required: [id, direction, amount, date, createdAt]
+      properties:
+        id:
+          type: string
+          example: clmov001
+        direction:
+          type: string
+          enum: [ALLOCATION, WITHDRAWAL]
+        amount:
+          type: number
+          format: double
+          description: Always positive. Direction indicates sign.
+          example: 200.00
+        note:
+          type: [string, "null"]
+          example: "Virement mensuel"
+        date:
+          type: string
+          format: date
+          example: "2026-02-23"
+        createdAt:
+          type: string
+          format: date-time
+
+    PocketDetail:
+      allOf:
+        - $ref: '#/components/schemas/PocketSummary'
+        - type: object
+          required: [movements, nextCursor]
+          properties:
+            movements:
+              type: array
+              items:
+                $ref: '#/components/schemas/PocketMovement'
+              description: Reverse chronological order (date DESC)
+            nextCursor:
+              type: [string, "null"]
+              description: Cursor for next page of movements; null if no more pages
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: "name is required"
+
+paths:
+
+  /pockets:
+    get:
+      operationId: listPockets
+      summary: List all pockets for the authenticated user
+      description: >
+        Returns all pockets across all accounts, each with computed allocatedAmount
+        and progressPct. Ordered by accountLabel ASC, then createdAt ASC.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pockets]
+                properties:
+                  pockets:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PocketSummary'
+              example:
+                pockets:
+                  - id: clpkt001
+                    accountLabel: "Livret A"
+                    name: "Vacances été"
+                    goalAmount: 2000.00
+                    allocatedAmount: 850.00
+                    progressPct: 42.5
+                    color: "#3b82f6"
+                    createdAt: "2026-02-23T10:00:00.000Z"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      operationId: createPocket
+      summary: Create a new pocket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [accountLabel, name, goalAmount, color]
+              properties:
+                accountLabel:
+                  type: string
+                  description: Must match an existing account in the user's transaction data
+                  example: "Livret A"
+                name:
+                  type: string
+                  maxLength: 100
+                  example: "Vacances été"
+                goalAmount:
+                  type: number
+                  format: double
+                  minimum: 0.01
+                  example: 2000.00
+                color:
+                  type: string
+                  pattern: '^#[0-9a-fA-F]{6}$'
+                  example: "#3b82f6"
+      responses:
+        "201":
+          description: Pocket created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PocketSummary'
+        "400":
+          description: Validation error (missing/invalid fields)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingName:
+                  value: { error: VALIDATION_ERROR, message: "name is required" }
+                invalidGoal:
+                  value: { error: VALIDATION_ERROR, message: "goalAmount must be greater than 0" }
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+
+  /pockets/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+
+    get:
+      operationId: getPocket
+      summary: Get pocket detail with paginated movement history
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Pagination cursor from previous response
+      responses:
+        "200":
+          description: Pocket detail with movements
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PocketDetail'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      operationId: updatePocket
+      summary: Update pocket name, goal amount, or colour
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                goalAmount:
+                  type: number
+                  format: double
+                  minimum: 0.01
+                color:
+                  type: string
+                  pattern: '^#[0-9a-fA-F]{6}$'
+      responses:
+        "200":
+          description: Updated pocket
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PocketSummary'
+        "400":
+          $ref: '#/components/responses/ValidationError'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      operationId: deletePocket
+      summary: Delete a pocket and all its movements
+      responses:
+        "204":
+          description: Pocket deleted
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+  /pockets/{id}/movements:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+
+    post:
+      operationId: createMovement
+      summary: Add an allocation or withdrawal to a pocket
+      description: >
+        For ALLOCATION: validates that the new amount does not exceed the account headroom
+        (account balance minus total already allocated across all pockets for that account).
+        Returns 422 with INSUFFICIENT_HEADROOM error if the check fails.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [direction, amount, date]
+              properties:
+                direction:
+                  type: string
+                  enum: [ALLOCATION, WITHDRAWAL]
+                amount:
+                  type: number
+                  format: double
+                  minimum: 0.01
+                  example: 200.00
+                note:
+                  type: string
+                  maxLength: 255
+                  example: "Épargne mensuelle"
+                date:
+                  type: string
+                  format: date
+                  example: "2026-02-23"
+      responses:
+        "201":
+          description: Movement recorded; returns updated pocket summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PocketSummary'
+        "400":
+          $ref: '#/components/responses/ValidationError'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "422":
+          description: Business rule violation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                insufficientHeadroom:
+                  value:
+                    error: INSUFFICIENT_HEADROOM
+                    message: "Maximum allocatable amount is €350.00"
+                insufficientFunds:
+                  value:
+                    error: INSUFFICIENT_POCKET_FUNDS
+                    message: "Cannot withdraw more than the current allocated balance of €150.00"
+
+  /pockets/{id}/movements/{movementId}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: movementId
+        in: path
+        required: true
+        schema:
+          type: string
+
+    delete:
+      operationId: deleteMovement
+      summary: Delete a single movement (correction)
+      description: >
+        Permanently removes a movement. Re-computes the pocket's allocatedAmount.
+        Does not check account headroom (deletion always allowed).
+      responses:
+        "200":
+          description: Movement deleted; returns updated pocket summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PocketSummary'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+
+components:
+  responses:
+    Unauthorized:
+      description: Not authenticated
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: UNAUTHORIZED
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: NOT_FOUND
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

@@ -51,6 +51,12 @@ export function NavBar() {
               {formatMessage({ id: 'categories.title' })}
             </Link>
             <Link
+              to="/cagnottes"
+              className="text-sm font-medium text-slate-600 transition-colors hover:text-kasa-accent dark:text-slate-400 dark:hover:text-kasa-accent"
+            >
+              {formatMessage({ id: 'nav.pockets' })}
+            </Link>
+            <Link
               to="/profil"
               className="text-sm font-medium text-slate-600 transition-colors hover:text-kasa-accent dark:text-slate-400 dark:hover:text-kasa-accent"
             >

@@ -4,6 +4,7 @@ import { AccountCard } from '../components/AccountCard';
 import { DashboardSkeleton } from '../components/DashboardSkeleton';
 import { GlobalSummaryCard } from '../components/GlobalSummaryCard';
 import { useGetDashboardQuery } from '../services/dashboardApi';
+import { useListPocketsQuery } from '../services/pocketsApi';
 
 const LazySpendingChart = lazy(() => import('../components/SpendingChart'));
 
@@ -16,6 +17,7 @@ function ChartFallback() {
 export function DashboardPage() {
   const intl = useIntl();
   const { data, isLoading, isError, refetch } = useGetDashboardQuery();
+  const { data: pocketsData } = useListPocketsQuery();
 
   if (isLoading) {
     return (
@@ -58,7 +60,11 @@ export function DashboardPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
           {data.accounts.map((account) => (
-            <AccountCard key={account.label || 'default'} account={account} />
+            <AccountCard
+              key={account.label || 'default'}
+              account={account}
+              pockets={pocketsData?.pockets.filter((p) => p.accountLabel === account.label)}
+            />
           ))}
         </div>
       )}

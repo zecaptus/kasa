@@ -9,6 +9,8 @@ Auto-generated from all feature plans. Last updated: 2026-02-23
 - PostgreSQL 16 — 2 nouveaux modèles (`Category`, `CategoryRule`), 2 migrations (004-transactions)
 - TypeScript 5.7 (strict mode), Node.js 22 LTS + Recharts 2.x via shadcn chart wrapper (frontend), Koa 2 + @koa/router (backend), React 19 + RTK Query, Prisma 6 + PostgreSQL 16, react-intl (005-dashboard)
 - PostgreSQL 16 — 1 additive migration (new `account_label` column on `imported_transaction`) (005-dashboard)
+- TypeScript 5.7 (strict mode), Node.js 22 LTS + Koa 2 + @koa/router (backend), React 19 + RTK Query (frontend), Prisma 6 + PostgreSQL 16, react-intl (006-virtual-pockets)
+- PostgreSQL 16 — 2 new models (`Pocket`, `PocketMovement`), 1 new enum, 1 migration (006-virtual-pockets)
 
 - TypeScript 5.7 (strict) — Node.js 22 LTS (001-define-tech-stack)
 - argon2 + jsonwebtoken — auth backend (002-user-management)
@@ -68,9 +70,9 @@ pnpm --filter @kasa/db run db:generate  # regenerate Prisma client
 - Vitest 3 — coverage ≥ 80% per module (v8 provider)
 
 ## Recent Changes
+- 006-virtual-pockets: Added TypeScript 5.7 (strict mode), Node.js 22 LTS + Koa 2 + @koa/router (backend), React 19 + RTK Query (frontend), Prisma 6 + PostgreSQL 16, react-intl
 - 005-dashboard: Added TypeScript 5.7 (strict mode), Node.js 22 LTS + Recharts 2.x via shadcn chart wrapper (frontend), Koa 2 + @koa/router (backend), React 19 + RTK Query, Prisma 6 + PostgreSQL 16, react-intl
 - 004-transactions: Added TypeScript 5.7 (strict mode), Node.js 22 LTS + Koa 2 + @koa/router (backend), React 19 + RTK Query (frontend), Prisma 6 + PostgreSQL 16
-- 003-csv-import: Added TypeScript 5.7 (strict) — Node.js 22 LTS
 
 
 <!-- MANUAL ADDITIONS START -->

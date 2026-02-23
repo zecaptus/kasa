@@ -7,6 +7,7 @@ import categoriesRouter from './routes/categories.router';
 import dashboardRouter from './routes/dashboard.router';
 import expensesRouter from './routes/expenses.router';
 import importRouter from './routes/import.router';
+import pocketsRouter from './routes/pockets.router';
 import transactionsRouter from './routes/transactions.router';
 
 function createApp(): Koa {
@@ -50,6 +51,8 @@ function createApp(): Koa {
   app.use(categoriesRouter.allowedMethods());
   app.use(dashboardRouter.routes());
   app.use(dashboardRouter.allowedMethods());
+  app.use(pocketsRouter.routes());
+  app.use(pocketsRouter.allowedMethods());
 
   return app;
 }

@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { authApi } from '../services/authApi';
 import { dashboardApi } from '../services/dashboardApi';
 import { importApi } from '../services/importApi';
+import { pocketsApi } from '../services/pocketsApi';
 import { transactionsApi } from '../services/transactionsApi';
 import authReducer from './authSlice';
 import importReducer from './importSlice';
@@ -16,6 +17,7 @@ export const store = configureStore({
     [importApi.reducerPath]: importApi.reducer,
     [transactionsApi.reducerPath]: transactionsApi.reducer,
     [dashboardApi.reducerPath]: dashboardApi.reducer,
+    [pocketsApi.reducerPath]: pocketsApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -23,6 +25,7 @@ export const store = configureStore({
       importApi.middleware,
       transactionsApi.middleware,
       dashboardApi.middleware,
+      pocketsApi.middleware,
     ),
 });
 
