@@ -62,7 +62,7 @@ export interface ListTransactionsParams {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function buildTransactionParams(p: ListTransactionsParams): Record<string, unknown> {
+export function buildTransactionParams(p: ListTransactionsParams): Record<string, unknown> {
   const params: Record<string, unknown> = { limit: p.limit ?? 50 };
   if (p.cursor) params.cursor = p.cursor;
   if (p.from) params.from = p.from;
