@@ -33,11 +33,23 @@ function renderChart(categoryComparison: CategoryComparisonDto) {
 
 const baseData: CategoryComparisonDto = {
   currentMonth: [
-    { categoryId: 'cat1', name: 'Alimentation', slug: 'alimentation', color: '#22c55e', amount: 340 },
+    {
+      categoryId: 'cat1',
+      name: 'Alimentation',
+      slug: 'alimentation',
+      color: '#22c55e',
+      amount: 340,
+    },
     { categoryId: 'cat2', name: 'Transport', slug: 'transport', color: '#3b82f6', amount: 210 },
   ],
   previousMonth: [
-    { categoryId: 'cat1', name: 'Alimentation', slug: 'alimentation', color: '#22c55e', amount: 290 },
+    {
+      categoryId: 'cat1',
+      name: 'Alimentation',
+      slug: 'alimentation',
+      color: '#22c55e',
+      amount: 290,
+    },
   ],
 };
 
