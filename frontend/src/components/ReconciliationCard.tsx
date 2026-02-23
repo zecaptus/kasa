@@ -1,6 +1,6 @@
 import { useIntl } from 'react-intl';
 import { cn } from '../lib/cn';
-import type { ImportedTransactionDto } from '../services/importApi';
+import type { ImportedTransactionDto, ReconciliationCandidate } from '../services/importApi';
 import {
   useConfirmReconciliationMutation,
   useUndoReconciliationMutation,
@@ -23,6 +23,117 @@ const STATUS_I18N: Record<string, string> = {
   IGNORED: 'import.transaction.status.ignored',
 };
 
+function CandidatesList({
+  candidates,
+  transactionId,
+  onConfirm,
+  onDismiss,
+}: {
+  candidates: ReconciliationCandidate[];
+  transactionId: string;
+  onConfirm: (transactionId: string, expenseId: string) => void;
+  onDismiss: () => void;
+}) {
+  const intl = useIntl();
+
+  return (
+    <div className="mt-3">
+      <p className="mb-2 text-sm font-semibold text-slate-600">
+        {intl.formatMessage({ id: 'reconciliation.card.candidates.title' })}
+      </p>
+      <ul className="space-y-1">
+        {candidates.map((candidate) => (
+          <li
+            key={candidate.expense.id}
+            className="flex items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2.5"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-slate-800">
+                {candidate.expense.label}
+              </p>
+              <p className="text-sm text-slate-500">
+                {intl.formatMessage({
+                  id: `reconciliation.card.confidence.${candidate.confidence === 'high' ? 'high' : 'plausible'}`,
+                })}
+                {' · '}
+                {Math.round(candidate.score * 100)}%
+              </p>
+            </div>
+            <button
+              type="button"
+              className="shrink-0 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+              onClick={() => onConfirm(transactionId, candidate.expense.id)}
+            >
+              {intl.formatMessage({ id: 'reconciliation.card.candidates.select' })}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        className="mt-2 text-sm font-medium text-slate-500 hover:text-slate-700"
+        onClick={onDismiss}
+      >
+        {intl.formatMessage({ id: 'reconciliation.card.candidates.dismiss' })}
+      </button>
+    </div>
+  );
+}
+
+function TransactionActions({
+  status,
+  transactionId,
+  reconciliationId,
+  onUpdateStatus,
+  onUndoReconciliation,
+}: {
+  status: string;
+  transactionId: string;
+  reconciliationId: string | null;
+  onUpdateStatus: (transactionId: string, status: 'IGNORED' | 'UNRECONCILED') => void;
+  onUndoReconciliation: (reconciliationId: string) => void;
+}) {
+  const intl = useIntl();
+
+  if (status === 'UNRECONCILED') {
+    return (
+      <button
+        type="button"
+        className="text-sm font-medium text-slate-500 hover:text-slate-700"
+        onClick={() => onUpdateStatus(transactionId, 'IGNORED')}
+      >
+        {intl.formatMessage({ id: 'reconciliation.action.ignore' })}
+      </button>
+    );
+  }
+
+  if (status === 'IGNORED') {
+    return (
+      <button
+        type="button"
+        className="text-sm font-medium text-slate-500 hover:text-slate-700"
+        onClick={() => onUpdateStatus(transactionId, 'UNRECONCILED')}
+      >
+        {intl.formatMessage({ id: 'reconciliation.action.unignore' })}
+      </button>
+    );
+  }
+
+  if (status === 'RECONCILED' && reconciliationId) {
+    return (
+      <button
+        type="button"
+        className="text-sm font-medium text-slate-500 hover:text-slate-700"
+        onClick={() => onUndoReconciliation(reconciliationId)}
+      >
+        {intl.formatMessage({ id: 'reconciliation.action.undo' })}
+      </button>
+    );
+  }
+
+  return null;
+}
+
 export function ReconciliationCard({ transaction: tx }: ReconciliationCardProps) {
   const intl = useIntl();
   const [confirmReconciliation] = useConfirmReconciliationMutation();
@@ -31,6 +142,17 @@ export function ReconciliationCard({ transaction: tx }: ReconciliationCardProps)
 
   const amount = tx.debit !== null ? -tx.debit : (tx.credit ?? 0);
   const isDebit = tx.debit !== null;
+
+  const handleConfirm = (transactionId: string, expenseId: string) => {
+    confirmReconciliation({
+      importedTransactionId: transactionId,
+      manualExpenseId: expenseId,
+    });
+  };
+
+  const handleUpdateStatus = (transactionId: string, status: 'IGNORED' | 'UNRECONCILED') => {
+    updateStatus({ transactionId, status });
+  };
 
   return (
     <div className="rounded-xl border border-slate-200 p-4">
@@ -79,87 +201,23 @@ export function ReconciliationCard({ transaction: tx }: ReconciliationCardProps)
 
       {/* Candidates list (ambiguous matches) */}
       {tx.status === 'UNRECONCILED' && tx.candidates && tx.candidates.length > 0 && (
-        <div className="mt-3">
-          <p className="mb-2 text-sm font-semibold text-slate-600">
-            {intl.formatMessage({ id: 'reconciliation.card.candidates.title' })}
-          </p>
-          <ul className="space-y-1">
-            {tx.candidates.map((candidate) => (
-              <li
-                key={candidate.expense.id}
-                className="flex items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2.5"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-slate-800">
-                    {candidate.expense.label}
-                  </p>
-                  <p className="text-sm text-slate-500">
-                    {intl.formatMessage({
-                      id: `reconciliation.card.confidence.${candidate.confidence === 'high' ? 'high' : 'plausible'}`,
-                    })}
-                    {' · '}
-                    {Math.round(candidate.score * 100)}%
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="shrink-0 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
-                  onClick={() =>
-                    confirmReconciliation({
-                      importedTransactionId: tx.id,
-                      manualExpenseId: candidate.expense.id,
-                    })
-                  }
-                >
-                  {intl.formatMessage({ id: 'reconciliation.card.candidates.select' })}
-                </button>
-              </li>
-            ))}
-          </ul>
-          <button
-            type="button"
-            className="mt-2 text-sm font-medium text-slate-500 hover:text-slate-700"
-            onClick={() => updateStatus({ transactionId: tx.id, status: 'UNRECONCILED' })}
-          >
-            {intl.formatMessage({ id: 'reconciliation.card.candidates.dismiss' })}
-          </button>
-        </div>
+        <CandidatesList
+          candidates={tx.candidates}
+          transactionId={tx.id}
+          onConfirm={handleConfirm}
+          onDismiss={() => handleUpdateStatus(tx.id, 'UNRECONCILED')}
+        />
       )}
 
       {/* Action buttons */}
       <div className="mt-3 flex gap-2">
-        {tx.status === 'UNRECONCILED' && (
-          <button
-            type="button"
-            className="text-sm font-medium text-slate-500 hover:text-slate-700"
-            onClick={() => updateStatus({ transactionId: tx.id, status: 'IGNORED' })}
-          >
-            {intl.formatMessage({ id: 'reconciliation.action.ignore' })}
-          </button>
-        )}
-        {tx.status === 'IGNORED' && (
-          <button
-            type="button"
-            className="text-sm font-medium text-slate-500 hover:text-slate-700"
-            onClick={() => updateStatus({ transactionId: tx.id, status: 'UNRECONCILED' })}
-          >
-            {intl.formatMessage({ id: 'reconciliation.action.unignore' })}
-          </button>
-        )}
-        {tx.status === 'RECONCILED' &&
-          tx.reconciliation &&
-          (() => {
-            const reconciliationId = tx.reconciliation.id;
-            return (
-              <button
-                type="button"
-                className="text-sm font-medium text-slate-500 hover:text-slate-700"
-                onClick={() => undoReconciliation(reconciliationId)}
-              >
-                {intl.formatMessage({ id: 'reconciliation.action.undo' })}
-              </button>
-            );
-          })()}
+        <TransactionActions
+          status={tx.status}
+          transactionId={tx.id}
+          reconciliationId={tx.reconciliation?.id ?? null}
+          onUpdateStatus={handleUpdateStatus}
+          onUndoReconciliation={undoReconciliation}
+        />
       </div>
     </div>
   );
