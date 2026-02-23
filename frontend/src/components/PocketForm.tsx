@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { cn } from '../lib/cn';
 import { useGetDashboardQuery } from '../services/dashboardApi';
@@ -76,6 +76,13 @@ export function PocketForm({ initialValues, onSuccess, onCancel }: Props) {
     errors,
     setErrors,
   } = usePocketFormState(initialValues, accounts);
+
+  // Auto-select first account once dashboard data loads (accounts is [] on initial render)
+  useEffect(() => {
+    if (!isEdit && !accountLabel && accounts[0]?.label) {
+      setAccountLabel(accounts[0].label);
+    }
+  }, [accounts, accountLabel, isEdit, setAccountLabel]);
 
   const [createPocket, { isLoading: isCreating }] = useCreatePocketMutation();
   const [updatePocket, { isLoading: isUpdating }] = useUpdatePocketMutation();
