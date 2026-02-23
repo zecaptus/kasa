@@ -1,3 +1,4 @@
+import { hash } from 'argon2';
 import { prisma } from '../src/client.js';
 
 const SYSTEM_CATEGORIES = [
@@ -62,6 +63,21 @@ async function main(): Promise<void> {
       });
     }
   }
+
+  // Upsert test user
+  const testEmail = 'test@kasa.dev';
+  const passwordHash = await hash('password');
+  await prisma.user.upsert({
+    where: { email: testEmail },
+    update: {},
+    create: {
+      email: testEmail,
+      passwordHash,
+      name: 'Test User',
+      locale: 'FR',
+    },
+  });
+  console.log(`Test user: ${testEmail} / password`);
 
   // Update existing ImportedTransactions that have empty accountLabel
   // to give them a representative label based on their session's filename.
