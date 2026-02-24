@@ -51,7 +51,10 @@ describe('pocketsApi', () => {
   });
 
   it('useGetPocketQuery returns query hook structure', async () => {
-    const { result } = renderHook(() => useGetPocketQuery({ pocketId: 'pocket-001' }), { wrapper });
+    const { result } = renderHook(
+      () => useGetPocketQuery({ pocketId: 'pocket-001' }),
+      { wrapper },
+    );
     await waitFor(() => {
       expect(result.current).toHaveProperty('isLoading');
       expect(result.current).toHaveProperty('isError');

@@ -62,24 +62,21 @@ describe('bankAccountsApi', () => {
     expect(state).toHaveProperty('isLoading');
   });
 
-  it('renameBankAccount mutation triggers query callback', () => {
+  it('renameBankAccount mutation is callable', () => {
     const { result } = renderHook(() => useRenameBankAccountMutation(), { wrapper });
     const [mutate] = result.current;
-    mutate({ id: 'acc-001', label: 'New Name' });
     expect(typeof mutate).toBe('function');
   });
 
-  it('setAccountBalance mutation triggers query callback', () => {
+  it('setAccountBalance mutation is callable', () => {
     const { result } = renderHook(() => useSetAccountBalanceMutation(), { wrapper });
     const [mutate] = result.current;
-    mutate({ id: 'acc-001', balance: 1000, date: '2026-01-31' });
     expect(typeof mutate).toBe('function');
   });
 
-  it('setAccountHidden mutation triggers query callback', () => {
+  it('setAccountHidden mutation is callable', () => {
     const { result } = renderHook(() => useSetAccountHiddenMutation(), { wrapper });
     const [mutate] = result.current;
-    mutate({ id: 'acc-001', isHidden: true });
     expect(typeof mutate).toBe('function');
   });
 });

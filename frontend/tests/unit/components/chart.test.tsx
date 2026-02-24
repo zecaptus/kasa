@@ -7,6 +7,8 @@ vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="responsive-container">{children}</div>
   ),
+  Tooltip: () => null,
+  Legend: () => null,
 }));
 
 // A simple component that calls useChart() to exercise the hook
