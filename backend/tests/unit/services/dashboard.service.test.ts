@@ -148,8 +148,28 @@ describe('getAccountSummaries', () => {
 
   it('returns two accounts with their recent transactions', async () => {
     const balanceRows = [
-      { account_label: 'Compte courant', balance: dec(1200), monthly_variation: dec(-300) },
-      { account_label: 'Livret A', balance: dec(5000), monthly_variation: dec(50) },
+      {
+        account_id: 'acc-courant',
+        account_label: 'Compte courant',
+        account_number: null,
+        is_hidden: false,
+        balance: dec(1200),
+        monthly_variation: dec(-300),
+        last_known_balance: null,
+        last_known_balance_date: null,
+        balance_delta: dec(0),
+      },
+      {
+        account_id: 'acc-livret',
+        account_label: 'Livret A',
+        account_number: null,
+        is_hidden: false,
+        balance: dec(5000),
+        monthly_variation: dec(50),
+        last_known_balance: null,
+        last_known_balance_date: null,
+        balance_delta: dec(0),
+      },
     ];
 
     const recentRows = [
@@ -159,7 +179,8 @@ describe('getAccountSummaries', () => {
         label: 'CARREFOUR',
         amount: dec(42.5),
         direction: 'debit',
-        account_label: 'Compte courant',
+        account_id: 'acc-courant',
+        transfer_peer_account_label: null,
       },
       {
         id: 'tx2',
@@ -167,7 +188,8 @@ describe('getAccountSummaries', () => {
         label: 'SALAIRE',
         amount: dec(2500),
         direction: 'credit',
-        account_label: 'Compte courant',
+        account_id: 'acc-courant',
+        transfer_peer_account_label: null,
       },
       {
         id: 'tx3',
@@ -175,12 +197,16 @@ describe('getAccountSummaries', () => {
         label: 'VIREMENT LIVRET',
         amount: dec(50),
         direction: 'credit',
-        account_label: 'Livret A',
+        account_id: 'acc-livret',
+        transfer_peer_account_label: null,
       },
     ];
 
-    // First call: balance rows; second call: recent tx rows
-    mockQueryRaw.mockResolvedValueOnce(balanceRows).mockResolvedValueOnce(recentRows);
+    // First call: balance rows; second call: recent tx rows; third call: prediction rows
+    mockQueryRaw
+      .mockResolvedValueOnce(balanceRows)
+      .mockResolvedValueOnce(recentRows)
+      .mockResolvedValueOnce([]);
 
     const result: AccountSummaryDto[] = await getAccountSummaries(USER_ID);
 
@@ -206,7 +232,8 @@ describe('getAccountSummaries', () => {
       .mockResolvedValueOnce([
         { account_label: 'Compte pro', balance: dec(8000), monthly_variation: dec(0) },
       ])
-      .mockResolvedValueOnce([]); // no recent transactions at all
+      .mockResolvedValueOnce([]) // no recent transactions at all
+      .mockResolvedValueOnce([]); // no predictions
 
     const result: AccountSummaryDto[] = await getAccountSummaries(USER_ID);
 
@@ -216,7 +243,7 @@ describe('getAccountSummaries', () => {
   });
 
   it('returns empty array when user has no accounts', async () => {
-    mockQueryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mockQueryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const result: AccountSummaryDto[] = await getAccountSummaries(USER_ID);
 

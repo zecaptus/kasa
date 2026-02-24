@@ -67,7 +67,7 @@ describe('parseSgCsv — accountLabel extraction', () => {
   describe('5col format', () => {
     it('extracts accountLabel from "Libellé du compte" pre-header', async () => {
       const buffer = make5colBuf('Libellé du compte;Compte courant');
-      const result = await parseSgCsv(buffer, 'irrelevant.csv');
+      const { transactions: result } = await parseSgCsv(buffer, 'irrelevant.csv');
 
       expect(result.length).toBeGreaterThan(0);
       for (const tx of result) {
@@ -77,7 +77,7 @@ describe('parseSgCsv — accountLabel extraction', () => {
 
     it('falls back to "Numéro de compte" when "Libellé du compte" is absent', async () => {
       const buffer = make5colBuf('Numéro de compte;FR76 3000 1234');
-      const result = await parseSgCsv(buffer);
+      const { transactions: result } = await parseSgCsv(buffer);
 
       expect(result.length).toBeGreaterThan(0);
       for (const tx of result) {
@@ -93,7 +93,7 @@ describe('parseSgCsv — accountLabel extraction', () => {
           '15/01/2025;15/01/2025;PAIEMENT CARREFOUR;42,50;\n',
         'windows-1252',
       );
-      const result = await parseSgCsv(plainCsv, 'compte-courant.csv');
+      const { transactions: result } = await parseSgCsv(plainCsv, 'compte-courant.csv');
 
       expect(result.length).toBeGreaterThan(0);
       for (const tx of result) {
@@ -107,7 +107,7 @@ describe('parseSgCsv — accountLabel extraction', () => {
           '15/01/2025;15/01/2025;PAIEMENT CARREFOUR;42,50;\n',
         'windows-1252',
       );
-      const result = await parseSgCsv(plainCsv);
+      const { transactions: result } = await parseSgCsv(plainCsv);
 
       expect(result.length).toBeGreaterThan(0);
       for (const tx of result) {
@@ -123,7 +123,7 @@ describe('parseSgCsv — accountLabel extraction', () => {
         '15/01/2025;15/01/2025;TEST;10,00;',
       ].join('\n');
       const buffer = iconv.encode(content, 'windows-1252');
-      const result = await parseSgCsv(buffer);
+      const { transactions: result } = await parseSgCsv(buffer);
 
       expect(result.length).toBeGreaterThan(0);
       expect(result[0]?.accountLabel).toBe('Compte courant');
@@ -133,7 +133,7 @@ describe('parseSgCsv — accountLabel extraction', () => {
   describe('4col format', () => {
     it('extracts accountLabel from "Libellé du compte" pre-header', async () => {
       const buffer = make4colBuf('Libellé du compte;Livret A');
-      const result = await parseSgCsv(buffer);
+      const { transactions: result } = await parseSgCsv(buffer);
 
       expect(result.length).toBeGreaterThan(0);
       for (const tx of result) {
@@ -143,7 +143,7 @@ describe('parseSgCsv — accountLabel extraction', () => {
 
     it('uses "Numéro de compte" fallback in 4col format', async () => {
       const buffer = make4colBuf('Numéro de compte;FR76 9999 8888');
-      const result = await parseSgCsv(buffer);
+      const { transactions: result } = await parseSgCsv(buffer);
 
       expect(result.length).toBeGreaterThan(0);
       expect(result[0]?.accountLabel).toBe('FR76 9999 8888');
@@ -153,7 +153,7 @@ describe('parseSgCsv — accountLabel extraction', () => {
   describe('5col-operation format', () => {
     it('extracts accountLabel from "Libellé du compte" pre-header', async () => {
       const buffer = make5colOperationBuf('Libellé du compte;Compte pro');
-      const result = await parseSgCsv(buffer, 'pro.csv');
+      const { transactions: result } = await parseSgCsv(buffer, 'pro.csv');
 
       expect(result.length).toBeGreaterThan(0);
       for (const tx of result) {

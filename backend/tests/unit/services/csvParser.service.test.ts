@@ -14,14 +14,14 @@ describe('parseSgCsv', () => {
   describe('format 5 colonnes (compte courant)', () => {
     it('parse un fichier SG valide et retourne les transactions', async () => {
       const buffer = loadFixture('sg-sample.csv');
-      const result = await parseSgCsv(buffer);
+      const { transactions: result } = await parseSgCsv(buffer);
 
       expect(result).toHaveLength(10);
     });
 
     it('extrait correctement date, libellé, débit et crédit', async () => {
       const buffer = loadFixture('sg-sample.csv');
-      const result = await parseSgCsv(buffer);
+      const { transactions: result } = await parseSgCsv(buffer);
 
       const first = result[0] as ParsedTransaction;
       expect(first.accountingDate).toEqual(new Date('2025-01-15'));
@@ -32,7 +32,7 @@ describe('parseSgCsv', () => {
 
     it('extrait les transactions créditrices correctement', async () => {
       const buffer = loadFixture('sg-sample.csv');
-      const result = await parseSgCsv(buffer);
+      const { transactions: result } = await parseSgCsv(buffer);
 
       const creditTx = result.find((t) => t.credit !== null);
       expect(creditTx).toBeDefined();
@@ -42,7 +42,7 @@ describe('parseSgCsv', () => {
 
     it('ignore la ligne preamble (numéro de compte)', async () => {
       const buffer = loadFixture('sg-sample.csv');
-      const result = await parseSgCsv(buffer);
+      const { transactions: result } = await parseSgCsv(buffer);
       // The preamble "Numéro de compte;12345678901" must not appear as a transaction
       const preambleTx = result.find((t) => t.label.includes('12345678901'));
       expect(preambleTx).toBeUndefined();
@@ -50,7 +50,7 @@ describe('parseSgCsv', () => {
 
     it('ignore la ligne footer (solde)', async () => {
       const buffer = loadFixture('sg-sample.csv');
-      const result = await parseSgCsv(buffer);
+      const { transactions: result } = await parseSgCsv(buffer);
       // "Solde au 15/01/2025" must not appear
       const footerTx = result.find((t) => t.label.includes('Solde au'));
       expect(footerTx).toBeUndefined();
@@ -58,7 +58,7 @@ describe('parseSgCsv', () => {
 
     it('normalise les montants (virgule → point)', async () => {
       const buffer = loadFixture('sg-sample.csv');
-      const result = await parseSgCsv(buffer);
+      const { transactions: result } = await parseSgCsv(buffer);
       // 42,50 should become 42.5
       const tx = result.find((t) => t.debit !== null && t.label.includes('CARREFOUR'));
       expect(tx?.debit).toBe(42.5);
@@ -68,7 +68,7 @@ describe('parseSgCsv', () => {
   describe('fichier vide ou invalide', () => {
     it('retourne un tableau vide pour un fichier avec seulement un header', async () => {
       const csv = Buffer.from('Date de comptabilisation;Date de valeur;Libellé;Débit;Crédit\n');
-      const result = await parseSgCsv(csv);
+      const { transactions: result } = await parseSgCsv(csv);
       expect(result).toHaveLength(0);
     });
 
@@ -88,7 +88,7 @@ describe('parseSgCsv', () => {
           'bad_line_with_only_one_column\n' +
           '14/01/2025;14/01/2025;AMAZON;29,99;\n',
       );
-      const result = await parseSgCsv(csv);
+      const { transactions: result } = await parseSgCsv(csv);
       expect(result).toHaveLength(2);
     });
   });
@@ -100,7 +100,7 @@ describe('parseSgCsv', () => {
           '15/01/2025;VIREMENT ENTRANT;500,00;EUR\n' +
           '10/01/2025;RETRAIT;-100,00;EUR\n',
       );
-      const result = await parseSgCsv(csv);
+      const { transactions: result } = await parseSgCsv(csv);
       expect(result).toHaveLength(2);
 
       const credit = result.find((t) => t.credit !== null);
@@ -122,7 +122,7 @@ describe('parseSgCsv', () => {
       // Encode as Windows-1252 to simulate real SG file
       const csv = iconv.encode(content, 'windows-1252');
 
-      const result = await parseSgCsv(csv);
+      const { transactions: result } = await parseSgCsv(csv);
       expect(result).toHaveLength(3);
 
       const debit = result[0];
@@ -148,7 +148,7 @@ describe('parseSgCsv', () => {
       // Encode as Windows-1252
       const csv = iconv.encode(content, 'windows-1252');
 
-      const result = await parseSgCsv(csv);
+      const { transactions: result } = await parseSgCsv(csv);
       expect(result).toHaveLength(1);
       expect(result[0]?.label).toBe('TEST');
       expect(result[0]?.detail).toBe('DETAIL');

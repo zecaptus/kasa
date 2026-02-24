@@ -1,29 +1,44 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
+import { Provider } from 'react-redux';
 import { describe, expect, it, vi } from 'vitest';
 import { TransactionDetail } from '../../../src/components/TransactionDetail';
 import enMessages from '../../../src/i18n/en.json';
 import type { UnifiedTransactionDto } from '../../../src/services/transactionsApi';
+import { store } from '../../../src/store';
 
-vi.mock('../../../src/services/transactionsApi', () => ({
-  useUpdateTransactionCategoryMutation: () => [vi.fn(), { isLoading: false }],
-  useListCategoriesQuery: () => ({
-    data: {
-      categories: [
-        {
-          id: 'cat1',
-          name: 'Alimentation',
-          slug: 'food',
-          color: '#22c55e',
-          isSystem: true,
-          userId: null,
-          createdAt: '',
-        },
-      ],
-    },
-    isLoading: false,
-  }),
-}));
+vi.mock('../../../src/services/recurringPatternsApi', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../../src/services/recurringPatternsApi')>();
+  return {
+    ...actual,
+    useListRecurringPatternsQuery: () => ({ data: { patterns: [] }, isLoading: false }),
+  };
+});
+
+vi.mock('../../../src/services/transactionsApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/services/transactionsApi')>();
+  return {
+    ...actual,
+    useUpdateTransactionCategoryMutation: () => [vi.fn(), { isLoading: false }],
+    useListCategoriesQuery: () => ({
+      data: {
+        categories: [
+          {
+            id: 'cat1',
+            name: 'Alimentation',
+            slug: 'food',
+            color: '#22c55e',
+            isSystem: true,
+            userId: null,
+            createdAt: '',
+          },
+        ],
+      },
+      isLoading: false,
+    }),
+  };
+});
 
 const mockTransaction: UnifiedTransactionDto = {
   id: 'tx1',
@@ -49,9 +64,11 @@ const mockTransaction: UnifiedTransactionDto = {
 
 function renderDetail(transaction: UnifiedTransactionDto | null, onClose = vi.fn()) {
   return render(
-    <IntlProvider messages={enMessages} locale="en" defaultLocale="en">
-      <TransactionDetail transaction={transaction} onClose={onClose} />
-    </IntlProvider>,
+    <Provider store={store}>
+      <IntlProvider messages={enMessages} locale="en" defaultLocale="en">
+        <TransactionDetail transaction={transaction} onClose={onClose} />
+      </IntlProvider>
+    </Provider>,
   );
 }
 
