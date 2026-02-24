@@ -140,7 +140,7 @@ describe('POST /api/pockets', () => {
 
   it('returns 401 when no auth cookie is provided', async () => {
     const res = await request(app).post('/api/pockets').send({
-      accountLabel: 'Compte courant',
+      accountId: 'account-001',
       name: 'Vacances',
       goalAmount: 1000,
       color: '#ff5733',
@@ -149,7 +149,7 @@ describe('POST /api/pockets', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 400 when accountLabel is missing', async () => {
+  it('returns 400 when accountId is missing', async () => {
     const cookie = await makeAuthCookie();
     const res = await request(app)
       .post('/api/pockets')
@@ -159,7 +159,7 @@ describe('POST /api/pockets', () => {
     expect(res.status).toBe(400);
     const body = res.body as { error: string; message: string };
     expect(body.error).toBe('VALIDATION_ERROR');
-    expect(body.message).toMatch(/accountLabel/);
+    expect(body.message).toMatch(/accountId/);
   });
 
   it('returns 400 when name is missing', async () => {
@@ -167,7 +167,7 @@ describe('POST /api/pockets', () => {
     const res = await request(app)
       .post('/api/pockets')
       .set('Cookie', cookie)
-      .send({ accountLabel: 'Compte courant', goalAmount: 1000, color: '#ff5733' });
+      .send({ accountId: 'account-001', goalAmount: 1000, color: '#ff5733' });
 
     expect(res.status).toBe(400);
     const body = res.body as { error: string; message: string };
@@ -180,7 +180,7 @@ describe('POST /api/pockets', () => {
     const res = await request(app)
       .post('/api/pockets')
       .set('Cookie', cookie)
-      .send({ accountLabel: 'Compte courant', name: 'Vacances', goalAmount: -5, color: '#ff5733' });
+      .send({ accountId: 'account-001', name: 'Vacances', goalAmount: -5, color: '#ff5733' });
 
     expect(res.status).toBe(400);
     const body = res.body as { error: string; message: string };
@@ -193,7 +193,7 @@ describe('POST /api/pockets', () => {
     const res = await request(app)
       .post('/api/pockets')
       .set('Cookie', cookie)
-      .send({ accountLabel: 'Compte courant', name: 'Vacances', goalAmount: 1000, color: 'red' });
+      .send({ accountId: 'account-001', name: 'Vacances', goalAmount: 1000, color: 'red' });
 
     expect(res.status).toBe(400);
     const body = res.body as { error: string; message: string };
@@ -206,7 +206,7 @@ describe('POST /api/pockets', () => {
 
     const cookie = await makeAuthCookie();
     const res = await request(app).post('/api/pockets').set('Cookie', cookie).send({
-      accountLabel: 'Compte courant',
+      accountId: 'account-001',
       name: 'Vacances',
       goalAmount: 1000,
       color: '#ff5733',

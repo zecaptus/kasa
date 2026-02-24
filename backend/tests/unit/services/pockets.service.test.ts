@@ -23,6 +23,7 @@ const mockMovementCreate = vi.fn();
 const mockMovementFindFirst = vi.fn();
 const mockMovementDelete = vi.fn();
 const mockQueryRaw = vi.fn();
+const mockAccountFindFirst = vi.fn();
 
 vi.mock('@kasa/db', () => ({
   Prisma: {
@@ -42,6 +43,9 @@ vi.mock('@kasa/db', () => ({
   },
   prisma: {
     $queryRaw: (...args: unknown[]) => mockQueryRaw(...args),
+    account: {
+      findFirst: (...args: unknown[]) => mockAccountFindFirst(...args),
+    },
     pocket: {
       findMany: (...args: unknown[]) => mockPocketFindMany(...args),
       create: (...args: unknown[]) => mockPocketCreate(...args),
@@ -68,11 +72,13 @@ const USER_ID = 'user-abc-123';
 const POCKET_ID = 'pocket-001';
 const MOVEMENT_ID = 'movement-001';
 
+const ACCOUNT_ID = 'account-001';
+
 function makePocketRow(overrides: Record<string, unknown> = {}) {
   return {
     id: POCKET_ID,
     userId: USER_ID,
-    accountLabel: 'Compte courant',
+    accountId: ACCOUNT_ID,
     name: 'Vacances',
     goalAmount: dec(1000),
     color: '#ff5733',
@@ -136,10 +142,11 @@ describe('createPocket', () => {
   });
 
   it('creates pocket and returns summary with zero allocatedAmount', async () => {
+    mockAccountFindFirst.mockResolvedValue({ id: ACCOUNT_ID });
     mockPocketCreate.mockResolvedValue(makePocketRow());
 
     const result: PocketSummaryDto = await createPocket(USER_ID, {
-      accountLabel: 'Compte courant',
+      accountId: ACCOUNT_ID,
       name: 'Vacances',
       goalAmount: 1000,
       color: '#ff5733',
