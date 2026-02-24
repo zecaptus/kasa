@@ -22,6 +22,7 @@ enum ReconciliationStatus {
 enum CategorySource {
   NONE
   AUTO
+  AI
   MANUAL
 }
 
