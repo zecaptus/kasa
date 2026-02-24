@@ -187,13 +187,14 @@ export async function getGlobalSummary(userId: string): Promise<DashboardSummary
   const [summaryRows, manualRows] = await Promise.all([
     prisma.$queryRaw<GlobalSummaryRow[]>(Prisma.sql`
       SELECT
-        COALESCE(SUM(COALESCE("credit", 0) - COALESCE("debit", 0)), 0) AS total_balance,
-        COALESCE(SUM(CASE WHEN "accountingDate" >= ${start} AND "accountingDate" < ${end}
-                         THEN COALESCE("debit", 0) ELSE 0 END), 0)     AS monthly_spending_imported,
-        COALESCE(SUM(CASE WHEN "accountingDate" >= ${start} AND "accountingDate" < ${end}
-                         THEN COALESCE("credit", 0) ELSE 0 END), 0)    AS monthly_income
-      FROM "ImportedTransaction"
-      WHERE "userId" = ${userId}
+        COALESCE(SUM(COALESCE(it."credit", 0) - COALESCE(it."debit", 0)), 0) AS total_balance,
+        COALESCE(SUM(CASE WHEN it."accountingDate" >= ${start} AND it."accountingDate" < ${end}
+                         THEN COALESCE(it."debit", 0) ELSE 0 END), 0)        AS monthly_spending_imported,
+        COALESCE(SUM(CASE WHEN it."accountingDate" >= ${start} AND it."accountingDate" < ${end}
+                         THEN COALESCE(it."credit", 0) ELSE 0 END), 0)       AS monthly_income
+      FROM "ImportedTransaction" it
+      JOIN "Account" a ON a.id = it."accountId" AND a."isHidden" = false
+      WHERE it."userId" = ${userId}
     `),
     prisma.$queryRaw<MonthlyExpenseRow[]>(Prisma.sql`
       SELECT COALESCE(SUM("amount"), 0) AS monthly_spending_manual
@@ -359,12 +360,13 @@ export async function getCategoryComparison(userId: string): Promise<CategoryCom
         c."color"  AS cat_color,
         COALESCE(SUM(t.amount), 0) AS amount
       FROM (
-        SELECT "categoryId" AS category_id, COALESCE("debit", 0) AS amount
-        FROM "ImportedTransaction"
-        WHERE "userId" = ${userId}
-          AND "accountingDate" >= ${start}
-          AND "accountingDate" < ${end}
-          AND "debit" IS NOT NULL
+        SELECT it."categoryId" AS category_id, COALESCE(it."debit", 0) AS amount
+        FROM "ImportedTransaction" it
+        JOIN "Account" a ON a.id = it."accountId" AND a."isHidden" = false
+        WHERE it."userId" = ${userId}
+          AND it."accountingDate" >= ${start}
+          AND it."accountingDate" < ${end}
+          AND it."debit" IS NOT NULL
 
         UNION ALL
 
