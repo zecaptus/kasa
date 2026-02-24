@@ -42,7 +42,7 @@ function SpendingChart({ categoryComparison }: Props) {
       <section
         aria-roledescription="chart"
         aria-label={titleLabel}
-        className="flex min-h-[200px] items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+        className="card flex min-h-[200px] items-center justify-center p-6"
       >
         <p className="text-sm text-slate-400">{emptyLabel}</p>
       </section>
@@ -56,32 +56,43 @@ function SpendingChart({ categoryComparison }: Props) {
     previous: { label: previousLabel, color: 'hsl(217 91% 60%)' },
   };
 
+  const tooltipStyle = {
+    backgroundColor: 'var(--chart-tooltip-bg)',
+    border: '1px solid var(--chart-tooltip-border)',
+    borderRadius: '0.75rem',
+    color: 'var(--chart-tooltip-text)',
+  };
+
   return (
-    <section
-      aria-roledescription="chart"
-      aria-label={titleLabel}
-      className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-    >
-      <h2 className="mb-4 text-lg font-semibold text-slate-800">{titleLabel}</h2>
+    <section aria-roledescription="chart" aria-label={titleLabel} className="card p-6">
+      <h2 className="mb-4 section-title">{titleLabel}</h2>
       <ChartContainer config={chartConfig} className="h-64 w-full">
         <BarChart data={rows} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
-          <CartesianGrid vertical={false} strokeDasharray="3 3" />
-          <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+          <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--chart-grid)" />
+          <XAxis
+            dataKey="name"
+            tickLine={false}
+            axisLine={false}
+            tick={{ fontSize: 11, fill: 'var(--chart-tick)' }}
+          />
           <YAxis
             tickLine={false}
             axisLine={false}
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: 11, fill: 'var(--chart-tick)' }}
             tickFormatter={(v: number) =>
               intl.formatNumber(v, { style: 'currency', currency: 'EUR', notation: 'compact' })
             }
           />
           <Tooltip
+            cursor={{ fill: '#64748b', fillOpacity: 0.15 }}
+            contentStyle={tooltipStyle}
             formatter={(value: number | undefined, name: string | undefined) => [
               intl.formatNumber(value ?? 0, { style: 'currency', currency: 'EUR' }),
               name === 'current' ? currentLabel : previousLabel,
             ]}
           />
           <Legend
+            wrapperStyle={{ color: 'var(--chart-tick)' }}
             formatter={(value: string) => (value === 'current' ? currentLabel : previousLabel)}
           />
           <Bar dataKey="current" fill="var(--color-current)" radius={[4, 4, 0, 0]} />

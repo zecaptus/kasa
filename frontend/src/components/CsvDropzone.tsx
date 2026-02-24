@@ -40,11 +40,12 @@ export function CsvDropzone({ onUpload, isUploading = false, error }: CsvDropzon
         className={cn(
           'flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-8 transition-colors cursor-pointer',
           {
-            'border-blue-400 bg-blue-50': isDragging,
-            'border-slate-300 bg-slate-50 hover:border-blue-300 hover:bg-blue-50/50':
+            'border-kasa-accent/60 bg-kasa-accent/5 dark:bg-kasa-accent/10': isDragging,
+            'border-slate-300 bg-slate-50 hover:border-kasa-accent/40 hover:bg-kasa-accent/5 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:border-kasa-accent/40 dark:hover:bg-kasa-accent/10':
               !isDragging && !isUploading,
-            'border-slate-200 bg-slate-100 cursor-not-allowed opacity-60': isUploading,
-            'border-red-300 bg-red-50': !!error,
+            'border-slate-200 bg-slate-100 cursor-not-allowed opacity-60 dark:border-slate-700 dark:bg-slate-800':
+              isUploading,
+            'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/40': !!error,
           },
         )}
         onDragOver={(e) => {
@@ -68,8 +69,8 @@ export function CsvDropzone({ onUpload, isUploading = false, error }: CsvDropzon
 
         {isUploading ? (
           <>
-            <div className="size-8 animate-spin rounded-full border-2 border-blue-400 border-t-transparent" />
-            <p className="text-sm text-slate-500">
+            <div className="size-8 animate-spin rounded-full border-2 border-kasa-accent border-t-transparent" />
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               {intl.formatMessage({ id: 'import.dropzone.uploading' })}
             </p>
           </>
@@ -89,7 +90,7 @@ export function CsvDropzone({ onUpload, isUploading = false, error }: CsvDropzon
                 d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
               />
             </svg>
-            <p className="text-center text-sm font-medium text-slate-700 sm:text-base">
+            <p className="text-center text-sm font-medium text-slate-700 dark:text-slate-200 sm:text-base">
               {intl.formatMessage({ id: 'import.dropzone.label' })}
             </p>
             <p className="text-xs text-slate-400">

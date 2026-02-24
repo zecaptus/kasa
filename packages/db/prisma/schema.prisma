@@ -30,6 +30,17 @@ enum PocketMovementDir {
   WITHDRAWAL
 }
 
+enum RecurrenceFrequency {
+  WEEKLY
+  MONTHLY
+  ANNUAL
+}
+
+enum RecurrenceSource {
+  AUTO
+  MANUAL
+}
+
 model User {
   id                  String         @id @default(cuid())
   email               String         @unique
@@ -47,23 +58,61 @@ model User {
   categories           Category[]
   categoryRules        CategoryRule[]
   pockets              Pocket[]
+  ownedAccounts        Account[]      @relation("AccountOwner")
+  viewableAccounts     AccountViewer[]
+  recurringPatterns    RecurringPattern[]
+}
+
+model Account {
+  id                   String    @id @default(cuid())
+  accountNumber        String
+  label                String
+  ownerId              String
+  isHidden             Boolean   @default(false)
+  lastKnownBalance     Decimal?  @db.Decimal(12, 2)
+  lastKnownBalanceDate DateTime? @db.Date
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  owner                User                  @relation("AccountOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  viewers              AccountViewer[]
+  importSessions       ImportSession[]
+  importedTransactions ImportedTransaction[]
+  pockets              Pocket[]
+
+  @@unique([ownerId, accountNumber])
+  @@index([ownerId])
+}
+
+model AccountViewer {
+  id        String   @id @default(cuid())
+  accountId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, userId])
+  @@index([userId])
 }
 
 model Pocket {
-  id           String   @id @default(cuid())
-  userId       String
-  accountLabel String
-  name         String   @db.VarChar(100)
-  goalAmount   Decimal  @db.Decimal(12, 2)
-  color        String   @default("#94a3b8")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id         String   @id @default(cuid())
+  userId     String
+  accountId  String
+  name       String   @db.VarChar(100)
+  goalAmount Decimal  @db.Decimal(12, 2)
+  color      String   @default("#94a3b8")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account   Account          @relation(fields: [accountId], references: [id], onDelete: Cascade)
   movements PocketMovement[]
 
   @@index([userId])
-  @@index([userId, accountLabel])
+  @@index([accountId])
 }
 
 model PocketMovement {
@@ -82,42 +131,84 @@ model PocketMovement {
 }
 
 model ImportSession {
-  id         String   @id @default(cuid())
-  userId     String
-  filename   String
-  importedAt DateTime @default(now())
+  id               String    @id @default(cuid())
+  userId           String
+  accountId        String
+  filename         String
+  importedAt       DateTime  @default(now())
+  exportStartDate  DateTime? @db.Date
+  exportEndDate    DateTime? @db.Date
+  transactionCount Int?
+  balanceDate      DateTime? @db.Date
+  balance          Decimal?  @db.Decimal(12, 2)
+  currency         String?   @db.VarChar(3)
 
   user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account      Account               @relation(fields: [accountId], references: [id], onDelete: Cascade)
   transactions ImportedTransaction[]
 
   @@index([userId, importedAt])
+  @@index([accountId])
 }
 
 model ImportedTransaction {
   id             String               @id @default(cuid())
   sessionId      String
   userId         String
+  accountId      String
   accountingDate DateTime             @db.Date
   valueDate      DateTime?            @db.Date
   label          String
   detail         String?
   debit          Decimal?             @db.Decimal(12, 2)
   credit         Decimal?             @db.Decimal(12, 2)
-  accountLabel   String               @default("")
   status         ReconciliationStatus @default(UNRECONCILED)
   categoryId     String?
   categorySource CategorySource       @default(NONE)
   createdAt      DateTime             @default(now())
 
-  session        ImportSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category       Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  reconciliation Reconciliation?
+  categoryRuleId     String?
+  recurringPatternId String?
+  transferPeerId     String?
 
-  @@unique([userId, accountingDate, label, debit, credit], name: "dedup_key")
+  session          ImportSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account          Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category         Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryRule     CategoryRule?     @relation(fields: [categoryRuleId], references: [id], onDelete: SetNull)
+  recurringPattern RecurringPattern? @relation(fields: [recurringPatternId], references: [id], onDelete: SetNull)
+  reconciliation   Reconciliation?
+  transferPeer     ImportedTransaction?  @relation("TransferLink", fields: [transferPeerId], references: [id], onDelete: SetNull)
+  transferPeerOf   ImportedTransaction[] @relation("TransferLink")
+
+  @@unique([accountId, accountingDate, label, debit, credit], name: "dedup_key")
   @@index([userId, status])
   @@index([sessionId])
+  @@index([accountId])
   @@index([categoryId])
+  @@index([categoryRuleId])
+  @@index([recurringPatternId])
+  @@index([transferPeerId])
+}
+
+model RecurringPattern {
+  id                 String              @id @default(cuid())
+  userId             String
+  label              String
+  keyword            String
+  amount             Decimal?            @db.Decimal(12, 2)
+  frequency          RecurrenceFrequency
+  source             RecurrenceSource
+  isActive           Boolean             @default(true)
+  nextOccurrenceDate DateTime?           @db.Date
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions ImportedTransaction[]
+
+  @@index([userId])
+  @@index([userId, isActive])
 }
 
 model ManualExpense {
@@ -165,8 +256,9 @@ model CategoryRule {
   isSystem   Boolean  @default(false)
   createdAt  DateTime @default(now())
 
-  user     User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  user         User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category     Category              @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  transactions ImportedTransaction[]
 
   @@index([userId])
   @@index([isSystem])

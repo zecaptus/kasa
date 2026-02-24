@@ -82,38 +82,52 @@ router.get('/', async (ctx: Router.RouterContext) => {
 
 // ─── POST /api/pockets ────────────────────────────────────────────────────────
 
-router.post('/', async (ctx: Router.RouterContext) => {
-  const body = ctx.request.body as Record<string, unknown>;
-  const accountLabel = typeof body.accountLabel === 'string' ? body.accountLabel.trim() : '';
+function parseCreatePocketBody(
+  body: Record<string, unknown>,
+):
+  | { accountId: string; name: string; goalAmount: number; color: string }
+  | { validationError: string } {
+  const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+  if (!accountId) return { validationError: 'accountId is required' };
+
   const name = typeof body.name === 'string' ? body.name.trim() : '';
+  if (!name) return { validationError: 'name is required' };
+
   const goalAmount =
     typeof body.goalAmount === 'number' ? body.goalAmount : Number(body.goalAmount);
-  const color = typeof body.color === 'string' ? body.color.trim() : '';
-
-  if (typeof body.accountLabel !== 'string') {
-    ctx.status = 400;
-    ctx.body = { error: 'VALIDATION_ERROR', message: 'accountLabel is required' };
-    return;
-  }
-  if (!name) {
-    ctx.status = 400;
-    ctx.body = { error: 'VALIDATION_ERROR', message: 'name is required' };
-    return;
-  }
   if (!goalAmount || Number.isNaN(goalAmount) || goalAmount <= 0) {
-    ctx.status = 400;
-    ctx.body = { error: 'VALIDATION_ERROR', message: 'goalAmount must be greater than 0' };
-    return;
+    return { validationError: 'goalAmount must be greater than 0' };
   }
+
+  const color = typeof body.color === 'string' ? body.color.trim() : '';
   if (!color || !HEX_COLOR.test(color)) {
+    return { validationError: 'color must be a valid hex color (#rrggbb)' };
+  }
+
+  return { accountId, name, goalAmount, color };
+}
+
+router.post('/', async (ctx: Router.RouterContext) => {
+  const body = ctx.request.body as Record<string, unknown>;
+  const parsed = parseCreatePocketBody(body);
+  if ('validationError' in parsed) {
     ctx.status = 400;
-    ctx.body = { error: 'VALIDATION_ERROR', message: 'color must be a valid hex color (#rrggbb)' };
+    ctx.body = { error: 'VALIDATION_ERROR', message: parsed.validationError };
     return;
   }
 
-  const pocket = await createPocket(userId(ctx), { accountLabel, name, goalAmount, color });
-  ctx.status = 201;
-  ctx.body = pocket;
+  try {
+    const pocket = await createPocket(userId(ctx), parsed);
+    ctx.status = 201;
+    ctx.body = pocket;
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === 'ACCOUNT_NOT_FOUND') {
+      ctx.status = 404;
+      ctx.body = { error: 'ACCOUNT_NOT_FOUND', message: 'Account not found or not accessible' };
+      return;
+    }
+    throw err;
+  }
 });
 
 // ─── GET /api/pockets/:id ─────────────────────────────────────────────────────

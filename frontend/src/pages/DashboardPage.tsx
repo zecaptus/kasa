@@ -3,14 +3,16 @@ import { useIntl } from 'react-intl';
 import { AccountCard } from '../components/AccountCard';
 import { DashboardSkeleton } from '../components/DashboardSkeleton';
 import { GlobalSummaryCard } from '../components/GlobalSummaryCard';
+import { RecurringPatternRow } from '../components/RecurringPatternRow';
 import { useGetDashboardQuery } from '../services/dashboardApi';
 import { useListPocketsQuery } from '../services/pocketsApi';
+import { useListRecurringPatternsQuery } from '../services/recurringPatternsApi';
 
 const LazySpendingChart = lazy(() => import('../components/SpendingChart'));
 
 function ChartFallback() {
   return (
-    <div className="animate-pulse rounded-2xl border border-slate-200 bg-slate-200 p-6 shadow-sm h-[calc(theme(spacing.6)*2+theme(spacing.64))]" />
+    <div className="animate-pulse rounded-2xl border border-slate-200 bg-slate-200 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-700 h-[calc(theme(spacing.6)*2+theme(spacing.64))]" />
   );
 }
 
@@ -18,6 +20,23 @@ export function DashboardPage() {
   const intl = useIntl();
   const { data, isLoading, isError, refetch } = useGetDashboardQuery();
   const { data: pocketsData } = useListPocketsQuery();
+  const { data: recurringData } = useListRecurringPatternsQuery();
+
+  const now = new Date();
+  const in30Days = new Date(now);
+  in30Days.setDate(in30Days.getDate() + 30);
+
+  const upcomingPatterns = (recurringData?.patterns ?? [])
+    .filter((p) => {
+      if (!p.isActive || !p.nextOccurrenceDate) return false;
+      const next = new Date(p.nextOccurrenceDate);
+      return next >= now && next <= in30Days;
+    })
+    .sort((a, b) => {
+      if (!a.nextOccurrenceDate) return 1;
+      if (!b.nextOccurrenceDate) return -1;
+      return a.nextOccurrenceDate.localeCompare(b.nextOccurrenceDate);
+    });
 
   if (isLoading) {
     return (
@@ -61,7 +80,7 @@ export function DashboardPage() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
           {data.accounts.map((account) => (
             <AccountCard
-              key={account.label || 'default'}
+              key={account.accountId}
               account={account}
               pockets={pocketsData?.pockets.filter((p) => p.accountLabel === account.label)}
             />
@@ -73,6 +92,24 @@ export function DashboardPage() {
       <Suspense fallback={<ChartFallback />}>
         <LazySpendingChart categoryComparison={data.categoryComparison} />
       </Suspense>
+
+      {/* Upcoming recurring charges */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <h2 className="mb-4 text-base font-semibold text-slate-800 dark:text-slate-100">
+          {intl.formatMessage({ id: 'recurring.upcoming.title' })}
+        </h2>
+        {upcomingPatterns.length === 0 ? (
+          <p className="text-sm text-slate-400">
+            {intl.formatMessage({ id: 'recurring.upcoming.empty' })}
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+            {upcomingPatterns.map((pattern) => (
+              <RecurringPatternRow key={pattern.id} pattern={pattern} />
+            ))}
+          </ul>
+        )}
+      </section>
     </main>
   );
 }

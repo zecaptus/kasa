@@ -1,9 +1,42 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import { cn } from '../lib/cn';
+import { inputCls } from '../lib/inputCls';
 import { useCreateCategoryMutation, useUpdateCategoryMutation } from '../services/transactionsApi';
+import { Button } from './ui/Button';
 
-const PRESET_COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#94a3b8'] as const;
+const PRESET_COLORS = [
+  // Reds / pinks
+  '#ef4444',
+  '#f43f5e',
+  '#ec4899',
+  '#db2777',
+  // Oranges / yellows
+  '#f97316',
+  '#f59e0b',
+  '#eab308',
+  '#84cc16',
+  // Greens
+  '#22c55e',
+  '#10b981',
+  '#14b8a6',
+  '#06b6d4',
+  // Blues
+  '#3b82f6',
+  '#6366f1',
+  '#8b5cf6',
+  '#a855f7',
+  // Purples / neutrals
+  '#d946ef',
+  '#e879f9',
+  '#94a3b8',
+  '#64748b',
+  // Browns / warm
+  '#a16207',
+  '#92400e',
+  '#78350f',
+  '#1e293b',
+] as const;
 
 interface CategoryFormProps {
   onSuccess?: () => void;
@@ -22,16 +55,6 @@ export function CategoryForm({ onSuccess, initialValues, categoryId }: CategoryF
   const [name, setName] = useState(initialValues?.name ?? '');
   const [color, setColor] = useState(initialValues?.color ?? PRESET_COLORS[0]);
   const [nameError, setNameError] = useState('');
-
-  const inputCls = (hasError: boolean) =>
-    cn(
-      'w-full rounded-xl border bg-white px-4 py-2.5 text-sm text-kasa-dark outline-none transition-all placeholder:text-slate-400 dark:bg-slate-900 dark:text-slate-100',
-      {
-        'border-slate-200 focus:border-kasa-accent focus:ring-2 focus:ring-kasa-accent/15 dark:border-slate-700':
-          !hasError,
-        'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-200': hasError,
-      },
-    );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -73,7 +96,7 @@ export function CategoryForm({ onSuccess, initialValues, categoryId }: CategoryF
         <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
           {intl.formatMessage({ id: 'categories.color' })}
         </p>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-8 gap-1.5">
           {PRESET_COLORS.map((preset) => (
             <button
               key={preset}
@@ -81,7 +104,7 @@ export function CategoryForm({ onSuccess, initialValues, categoryId }: CategoryF
               aria-label={preset}
               onClick={() => setColor(preset)}
               className={cn(
-                'flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all',
+                'flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-all',
                 { 'ring-2 ring-kasa-accent ring-offset-2': color === preset },
               )}
               style={{ backgroundColor: preset }}
@@ -89,7 +112,7 @@ export function CategoryForm({ onSuccess, initialValues, categoryId }: CategoryF
               {color === preset && (
                 <svg
                   viewBox="0 0 12 12"
-                  className="h-3.5 w-3.5 text-white"
+                  className="h-3 w-3 text-white"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth={2}
@@ -102,18 +125,43 @@ export function CategoryForm({ onSuccess, initialValues, categoryId }: CategoryF
               )}
             </button>
           ))}
+          {/* Custom color picker */}
+          <label
+            className={cn(
+              'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-dashed border-slate-300 transition-all hover:border-slate-400 dark:border-slate-600 dark:hover:border-slate-500',
+              {
+                'ring-2 ring-kasa-accent ring-offset-2': !PRESET_COLORS.includes(
+                  color as (typeof PRESET_COLORS)[number],
+                ),
+              },
+            )}
+            title={intl.formatMessage({ id: 'categories.color.custom' })}
+            style={
+              !PRESET_COLORS.includes(color as (typeof PRESET_COLORS)[number])
+                ? { backgroundColor: color, borderStyle: 'solid', borderColor: 'transparent' }
+                : {}
+            }
+          >
+            {PRESET_COLORS.includes(color as (typeof PRESET_COLORS)[number]) && (
+              <span className="text-xs text-slate-400" aria-hidden="true">
+                +
+              </span>
+            )}
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              className="sr-only"
+            />
+          </label>
         </div>
       </div>
 
-      <button
-        type="submit"
-        disabled={isLoading}
-        className="w-full rounded-xl bg-kasa-accent px-4 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-kasa-accent-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
-      >
+      <Button type="submit" disabled={isLoading} className="w-full">
         {intl.formatMessage({
           id: isUpdateMode ? 'categories.form.submit.update' : 'categories.form.submit.create',
         })}
-      </button>
+      </Button>
     </form>
   );
 }

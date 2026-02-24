@@ -1,10 +1,12 @@
 import { useIntl } from 'react-intl';
 import { cn } from '../lib/cn';
+import { useListRecurringPatternsQuery } from '../services/recurringPatternsApi';
 import {
   type UnifiedTransactionDto,
   useUpdateTransactionCategoryMutation,
 } from '../services/transactionsApi';
 import { CategoryPicker } from './CategoryPicker';
+import { RecurringPatternPicker } from './RecurringPatternPicker';
 
 interface TransactionDetailProps {
   transaction: UnifiedTransactionDto | null;
@@ -23,9 +25,37 @@ const STATUS_BADGE: Record<string, string> = {
   IGNORED: 'bg-slate-100 text-slate-400',
 };
 
+function CategorySourceNote({ source }: { source: string }) {
+  const intl = useIntl();
+  if (source === 'NONE') return null;
+  const key =
+    source === 'AUTO' ? 'transactions.category.source.auto' : 'transactions.category.source.manual';
+  return <p className="text-xs text-slate-400">{intl.formatMessage({ id: key })}</p>;
+}
+
+function TransferInfoRow({ transaction }: { transaction: UnifiedTransactionDto }) {
+  const intl = useIntl();
+  if (transaction.transferPeerAccountLabel === null) return null;
+  const label =
+    transaction.direction === 'debit'
+      ? `→ ${transaction.transferPeerAccountLabel}`
+      : `← ${transaction.transferPeerAccountLabel}`;
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm text-slate-500">
+        {intl.formatMessage({ id: 'transactions.transfer.badge' })}
+      </span>
+      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
+        {label}
+      </span>
+    </div>
+  );
+}
+
 export function TransactionDetail({ transaction, onClose }: TransactionDetailProps) {
   const intl = useIntl();
   const [updateCategory, { isLoading }] = useUpdateTransactionCategoryMutation();
+  const { data: recurringData } = useListRecurringPatternsQuery();
 
   if (transaction === null) {
     return null;
@@ -135,17 +165,23 @@ export function TransactionDetail({ transaction, onClose }: TransactionDetailPro
               onChange={handleCategoryChange}
               disabled={isLoading}
             />
-            {transaction.categorySource !== 'NONE' && (
-              <p className="text-xs text-slate-400">
-                {intl.formatMessage({
-                  id:
-                    transaction.categorySource === 'AUTO'
-                      ? 'transactions.category.source.auto'
-                      : 'transactions.category.source.manual',
-                })}
-              </p>
-            )}
+            <CategorySourceNote source={transaction.categorySource} />
           </div>
+
+          <TransferInfoRow transaction={transaction} />
+
+          {transaction.type === 'IMPORTED_TRANSACTION' && (
+            <div className="space-y-2">
+              <span className="text-sm text-slate-500">
+                {intl.formatMessage({ id: 'recurring.link.title' })}
+              </span>
+              <RecurringPatternPicker
+                transactionId={transaction.id}
+                currentPatternId={transaction.recurringPatternId}
+                patterns={recurringData?.patterns ?? []}
+              />
+            </div>
+          )}
         </div>
       </div>
     </>

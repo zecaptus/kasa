@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
-import { cn } from '../lib/cn';
+import { inputCls } from '../lib/inputCls';
 import { useCreateExpenseMutation } from '../services/importApi';
 import { useListCategoriesQuery } from '../services/transactionsApi';
+import { Button } from './ui/Button';
 
 interface FormValues {
   amount: string;
@@ -18,7 +19,11 @@ interface FormErrors {
   category?: string;
 }
 
-export function ExpenseForm() {
+interface ExpenseFormProps {
+  onSuccess?: () => void;
+}
+
+export function ExpenseForm({ onSuccess }: ExpenseFormProps) {
   const intl = useIntl();
   const [createExpense, { isLoading }] = useCreateExpenseMutation();
   const { data: categoriesData } = useListCategoriesQuery();
@@ -69,6 +74,7 @@ export function ExpenseForm() {
       date: new Date().toISOString().slice(0, 10),
       categoryId: '',
     });
+    onSuccess?.();
   }
 
   function field(name: keyof FormValues) {
@@ -78,16 +84,6 @@ export function ExpenseForm() {
         setValues((v) => ({ ...v, [name]: e.target.value })),
     };
   }
-
-  const inputCls = (err?: string) =>
-    cn(
-      'w-full rounded-xl border bg-white px-4 py-2.5 text-sm text-kasa-dark outline-none transition-all placeholder:text-slate-400 dark:bg-slate-900 dark:text-slate-100',
-      {
-        'border-slate-200 focus:border-kasa-accent focus:ring-2 focus:ring-kasa-accent/15 dark:border-slate-700':
-          !err,
-        'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-200': !!err,
-      },
-    );
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-5">
@@ -107,7 +103,7 @@ export function ExpenseForm() {
           type="number"
           min="0.01"
           step="0.01"
-          className={inputCls(errors.amount)}
+          className={inputCls(!!errors.amount)}
           {...field('amount')}
         />
         {errors.amount && <p className="text-xs text-red-600 dark:text-red-400">{errors.amount}</p>}
@@ -124,7 +120,7 @@ export function ExpenseForm() {
           id="expense-label"
           type="text"
           maxLength={255}
-          className={inputCls(errors.label)}
+          className={inputCls(!!errors.label)}
           {...field('label')}
         />
         {errors.label && <p className="text-xs text-red-600 dark:text-red-400">{errors.label}</p>}
@@ -137,7 +133,12 @@ export function ExpenseForm() {
         >
           {intl.formatMessage({ id: 'expense.form.date' })}
         </label>
-        <input id="expense-date" type="date" className={inputCls(errors.date)} {...field('date')} />
+        <input
+          id="expense-date"
+          type="date"
+          className={inputCls(!!errors.date)}
+          {...field('date')}
+        />
         {errors.date && <p className="text-xs text-red-600 dark:text-red-400">{errors.date}</p>}
       </div>
 
@@ -150,7 +151,7 @@ export function ExpenseForm() {
         </label>
         <select
           id="expense-category"
-          className={inputCls(errors.category)}
+          className={inputCls(!!errors.category)}
           value={values.categoryId}
           onChange={(e) => setValues((v) => ({ ...v, categoryId: e.target.value }))}
         >
@@ -168,13 +169,9 @@ export function ExpenseForm() {
         )}
       </div>
 
-      <button
-        type="submit"
-        disabled={isLoading}
-        className="w-full rounded-xl bg-kasa-accent px-4 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-kasa-accent-hover hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
-      >
+      <Button type="submit" disabled={isLoading} className="w-full">
         {intl.formatMessage({ id: 'expense.form.submit' })}
-      </button>
+      </Button>
     </form>
   );
 }

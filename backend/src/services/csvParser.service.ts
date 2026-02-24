@@ -11,12 +11,28 @@ export interface ParsedTransaction {
   accountLabel: string;
 }
 
-type CsvFormat = '5col' | '4col' | '5col-operation';
+export interface CsvMetadata {
+  accountNumber: string | null;
+  exportStartDate: Date | null;
+  exportEndDate: Date | null;
+  transactionCount: number | null;
+  balanceDate: Date | null;
+  balance: number | null;
+  currency: string | null;
+}
+
+export interface ParsedCsvResult {
+  metadata: CsvMetadata;
+  transactions: ParsedTransaction[];
+}
+
+type CsvFormat = '5col' | '4col' | '5col-operation' | 'livret-a';
 
 const HEADER_5COL = 'Date de comptabilisation';
 const HEADER_5COL_OPERATION = "Date de l'opération";
 const HEADER_4COL_DATE = 'Date';
 const HEADER_4COL_MONTANT = 'Montant';
+const HEADER_LIVRET_A = 'date_comptabilisation';
 
 function decodeBuffer(buffer: Buffer): string {
   // Detect UTF-8 BOM
@@ -31,6 +47,70 @@ function parseAmount(raw: string | undefined): number | null {
   const normalized = raw.trim().replace(',', '.');
   const value = parseFloat(normalized);
   return Number.isNaN(value) ? null : value;
+}
+
+/**
+ * Extracts account number from Excel format ="..." or plain string
+ */
+function extractAccountNumber(raw: string | undefined): string | null {
+  return raw?.replace(/^="?|"?$/g, '').trim() || null;
+}
+
+/**
+ * Parses balance and currency from "3,39 EUR" format
+ */
+function parseBalanceWithCurrency(raw: string | undefined): {
+  balance: number | null;
+  currency: string | null;
+} {
+  if (!raw) return { balance: null, currency: null };
+
+  const parts = raw.trim().split(/\s+/);
+  const balance = parts[0] ? parseAmount(parts[0]) : null;
+  const currency = parts[1] ?? null;
+
+  return { balance, currency };
+}
+
+/**
+ * Parses the first metadata row of the CSV.
+ * Format: ="account_number";start_date;end_date;count;balance_date;balance currency
+ * Example: ="0105900051804855";01/02/2026;20/02/2026;35;18/02/2026;3,39 EUR
+ */
+function parseMetadataRow(row: string[]): CsvMetadata {
+  const emptyMetadata: CsvMetadata = {
+    accountNumber: null,
+    exportStartDate: null,
+    exportEndDate: null,
+    transactionCount: null,
+    balanceDate: null,
+    balance: null,
+    currency: null,
+  };
+
+  if (row.length < 6) return emptyMetadata;
+
+  const [accountRaw, startDateRaw, endDateRaw, countRaw, balanceDateRaw, balanceRaw] = row;
+
+  const accountNumber = extractAccountNumber(accountRaw);
+  const exportStartDate = startDateRaw ? parseDate(startDateRaw) : null;
+  const exportEndDate = endDateRaw ? parseDate(endDateRaw) : null;
+  const balanceDate = balanceDateRaw ? parseDate(balanceDateRaw) : null;
+
+  const countParsed = countRaw ? parseInt(countRaw.trim(), 10) : null;
+  const transactionCount = countParsed !== null && !Number.isNaN(countParsed) ? countParsed : null;
+
+  const { balance, currency } = parseBalanceWithCurrency(balanceRaw);
+
+  return {
+    accountNumber,
+    exportStartDate,
+    exportEndDate,
+    transactionCount,
+    balanceDate,
+    balance,
+    currency,
+  };
 }
 
 function parseDate(raw: string): Date {
@@ -48,6 +128,7 @@ function detectFormatFromRow(row: string[]): CsvFormat | null {
   if (first === HEADER_5COL) return '5col';
   if (first === HEADER_5COL_OPERATION) return '5col-operation';
   if (is4ColFormat(row, first)) return '4col';
+  if (first === HEADER_LIVRET_A) return 'livret-a';
   return null;
 }
 
@@ -64,6 +145,7 @@ function isHeaderRow(row: string[], format: CsvFormat): boolean {
   const first = row[0]?.trim() ?? '';
   if (format === '5col') return first === HEADER_5COL;
   if (format === '5col-operation') return first === HEADER_5COL_OPERATION;
+  if (format === 'livret-a') return first === HEADER_LIVRET_A;
   return first === HEADER_4COL_DATE;
 }
 
@@ -198,7 +280,100 @@ function parse5colOperation(
   return transactions;
 }
 
-export async function parseSgCsv(buffer: Buffer, filename?: string): Promise<ParsedTransaction[]> {
+/**
+ * Parses the short metadata row used by Livret A CSV exports.
+ * Format: ="account_number";start_date;end_date;
+ */
+function parseLivretAMetadata(row: string[]): CsvMetadata {
+  const [accountRaw, startDateRaw, endDateRaw] = row;
+  return {
+    accountNumber: extractAccountNumber(accountRaw),
+    exportStartDate: startDateRaw ? parseDate(startDateRaw) : null,
+    exportEndDate: endDateRaw ? parseDate(endDateRaw) : null,
+    transactionCount: null,
+    balanceDate: null,
+    balance: null,
+    currency: null,
+  };
+}
+
+/**
+ * Extracts metadata from first row if it matches metadata format, not a header row.
+ * Supports 6-column full format and 3-column Livret A format.
+ */
+function tryExtractMetadata(rows: string[][]): CsvMetadata {
+  const emptyMetadata: CsvMetadata = {
+    accountNumber: null,
+    exportStartDate: null,
+    exportEndDate: null,
+    transactionCount: null,
+    balanceDate: null,
+    balance: null,
+    currency: null,
+  };
+
+  const firstRow = rows[0];
+  if (!firstRow || detectFormatFromRow(firstRow)) return emptyMetadata;
+  if (firstRow.length >= 6) return parseMetadataRow(firstRow);
+
+  // Livret A short metadata: ="accountNumber";startDate;endDate;
+  const firstCell = firstRow[0] ?? '';
+  if (firstRow.length >= 3 && firstCell.startsWith('=')) return parseLivretAMetadata(firstRow);
+
+  return emptyMetadata;
+}
+
+function parseRowLivretA(row: string[], accountLabel: string): ParsedTransaction | null {
+  // Format: date_comptabilisation;libellé_complet_operation;montant_operation;devise;
+  // Rows have a trailing semicolon so csv-parse gives 5 elements, montant is at index 2.
+  const [dateStr, label, montantRaw] = row;
+  if (!dateStr || !label) return null;
+  const accountingDate = parseDate(dateStr);
+  if (Number.isNaN(accountingDate.getTime())) return null;
+  const montant = parseAmount(montantRaw);
+  return {
+    accountingDate,
+    valueDate: null,
+    label: label.trim(),
+    detail: null,
+    debit: montant !== null && montant < 0 ? Math.abs(montant) : null,
+    credit: montant !== null && montant > 0 ? montant : null,
+    accountLabel,
+  };
+}
+
+function parseLivretA(
+  rows: string[][],
+  headerIdx: number,
+  accountLabel: string,
+): ParsedTransaction[] {
+  const transactions: ParsedTransaction[] = [];
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const row = rows[i];
+    // At least date + label + montant (devise + trailing empty are optional)
+    if (!row || row.length < 3) continue;
+    const tx = parseRowLivretA(row, accountLabel);
+    if (tx) transactions.push(tx);
+  }
+  return transactions;
+}
+
+/**
+ * Parses transactions based on detected format
+ */
+function parseTransactionsByFormat(
+  rows: string[][],
+  format: CsvFormat,
+  headerIdx: number,
+  accountLabel: string,
+): ParsedTransaction[] {
+  if (format === '5col') return parse5col(rows, headerIdx, accountLabel);
+  if (format === '5col-operation') return parse5colOperation(rows, headerIdx, accountLabel);
+  if (format === 'livret-a') return parseLivretA(rows, headerIdx, accountLabel);
+  return parse4col(rows, headerIdx, accountLabel);
+}
+
+export async function parseSgCsv(buffer: Buffer, filename?: string): Promise<ParsedCsvResult> {
   if (buffer.length === 0) {
     throw new Error('INVALID_CSV_FORMAT');
   }
@@ -216,6 +391,8 @@ export async function parseSgCsv(buffer: Buffer, filename?: string): Promise<Par
     throw new Error('INVALID_CSV_FORMAT');
   }
 
+  const metadata = tryExtractMetadata(rows);
+
   const format = detectFormat(rows);
   if (!format) {
     throw new Error('INVALID_CSV_FORMAT');
@@ -227,13 +404,11 @@ export async function parseSgCsv(buffer: Buffer, filename?: string): Promise<Par
   }
 
   const accountLabel =
-    extractAccountLabel(rows, headerIdx) || (filename ? accountLabelFromFilename(filename) : '');
+    extractAccountLabel(rows, headerIdx) ||
+    metadata.accountNumber ||
+    (filename ? accountLabelFromFilename(filename) : '');
 
-  if (format === '5col') {
-    return parse5col(rows, headerIdx, accountLabel);
-  }
-  if (format === '5col-operation') {
-    return parse5colOperation(rows, headerIdx, accountLabel);
-  }
-  return parse4col(rows, headerIdx, accountLabel);
+  const transactions = parseTransactionsByFormat(rows, format, headerIdx, accountLabel);
+
+  return { metadata, transactions };
 }

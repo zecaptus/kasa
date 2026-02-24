@@ -1,14 +1,26 @@
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
-import { cn } from '../lib/cn';
+import { inputCls } from '../lib/inputCls';
 import {
   useCreateCategoryRuleMutation,
   useListCategoriesQuery,
   useUpdateCategoryRuleMutation,
 } from '../services/transactionsApi';
+import { Button } from './ui/Button';
+
+function validateRuleForm(
+  keyword: string,
+  categoryId: string,
+  fmt: (d: { id: string }) => string,
+): { keyword?: string; categoryId?: string } {
+  const errs: { keyword?: string; categoryId?: string } = {};
+  if (!keyword.trim()) errs.keyword = fmt({ id: 'categories.rules.keyword' });
+  if (!categoryId) errs.categoryId = fmt({ id: 'categories.rules.category' });
+  return errs;
+}
 
 interface CategoryRuleFormProps {
-  onSuccess?: () => void;
+  onSuccess?: (categorized?: number) => void;
   initialValues?: { keyword: string; categoryId: string };
   ruleId?: string;
 }
@@ -26,35 +38,20 @@ export function CategoryRuleForm({ onSuccess, initialValues, ruleId }: CategoryR
   const [categoryId, setCategoryId] = useState(initialValues?.categoryId ?? '');
   const [errors, setErrors] = useState<{ keyword?: string; categoryId?: string }>({});
 
-  const inputCls = (hasError: boolean) =>
-    cn(
-      'w-full rounded-xl border bg-white px-4 py-2.5 text-sm text-kasa-dark outline-none transition-all placeholder:text-slate-400 dark:bg-slate-900 dark:text-slate-100',
-      {
-        'border-slate-200 focus:border-kasa-accent focus:ring-2 focus:ring-kasa-accent/15 dark:border-slate-700':
-          !hasError,
-        'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-200': hasError,
-      },
-    );
-
   const categories = categoriesData?.categories ?? [];
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const errs: { keyword?: string; categoryId?: string } = {};
-    if (!keyword.trim()) errs.keyword = intl.formatMessage({ id: 'categories.rules.keyword' });
-    if (!categoryId) errs.categoryId = intl.formatMessage({ id: 'categories.rules.category' });
+    const errs = validateRuleForm(keyword, categoryId, intl.formatMessage);
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
       return;
     }
     setErrors({});
-
-    if (isUpdateMode) {
-      await updateRule({ id: ruleId, keyword: keyword.trim(), categoryId });
-    } else {
-      await createRule({ keyword: keyword.trim(), categoryId });
-    }
-    onSuccess?.();
+    const result = isUpdateMode
+      ? await updateRule({ id: ruleId, keyword: keyword.trim(), categoryId })
+      : await createRule({ keyword: keyword.trim(), categoryId });
+    onSuccess?.('data' in result ? result.data?.categorized : undefined);
   }
 
   return (
@@ -109,15 +106,11 @@ export function CategoryRuleForm({ onSuccess, initialValues, ruleId }: CategoryR
         )}
       </div>
 
-      <button
-        type="submit"
-        disabled={isLoading}
-        className="w-full rounded-xl bg-kasa-accent px-4 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-kasa-accent-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
-      >
+      <Button type="submit" disabled={isLoading} className="w-full">
         {intl.formatMessage({
           id: isUpdateMode ? 'categories.form.submit.update' : 'categories.form.submit.create',
         })}
-      </button>
+      </Button>
     </form>
   );
 }

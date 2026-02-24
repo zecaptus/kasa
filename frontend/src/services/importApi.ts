@@ -53,6 +53,15 @@ export interface ImportSessionDetail extends ImportSessionSummary {
   transactions: ImportedTransactionDto[];
   newCount?: number;
   skippedCount?: number;
+  accountId?: string;
+  accountNumber?: string | null;
+  exportStartDate?: string | null;
+  exportEndDate?: string | null;
+  transactionCount?: number | null;
+  balanceDate?: string | null;
+  balance?: number | null;
+  currency?: string | null;
+  balanceMissing?: boolean;
 }
 
 export interface ManualExpenseDto {

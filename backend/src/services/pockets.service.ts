@@ -4,7 +4,7 @@ import { Prisma, prisma } from '@kasa/db';
 
 export interface PocketSummaryDto {
   id: string;
-  accountLabel: string;
+  accountId: string;
   name: string;
   goalAmount: number;
   allocatedAmount: number;
@@ -30,7 +30,7 @@ export interface PocketDetailDto extends PocketSummaryDto {
 // ─── Input types ──────────────────────────────────────────────────────────────
 
 export interface CreatePocketInput {
-  accountLabel: string;
+  accountId: string;
   name: string;
   goalAmount: number;
   color: string;
@@ -58,7 +58,7 @@ function toNum(d: Prisma.Decimal | null | undefined): number {
 function toPocketSummary(
   pocket: {
     id: string;
-    accountLabel: string;
+    accountId: string;
     name: string;
     goalAmount: Prisma.Decimal;
     color: string;
@@ -69,7 +69,7 @@ function toPocketSummary(
   const goal = toNum(pocket.goalAmount);
   return {
     id: pocket.id,
-    accountLabel: pocket.accountLabel,
+    accountId: pocket.accountId,
     name: pocket.name,
     goalAmount: goal,
     allocatedAmount,
@@ -98,14 +98,14 @@ interface AllocatedRow {
 
 export async function computeHeadroom(
   userId: string,
-  accountLabel: string,
+  accountId: string,
   excludePocketId?: string,
 ): Promise<number> {
   const [balanceRows, allocRows] = await Promise.all([
     prisma.$queryRaw<HeadroomRow[]>(Prisma.sql`
       SELECT COALESCE(SUM(COALESCE("credit", 0) - COALESCE("debit", 0)), 0) AS account_balance
       FROM "ImportedTransaction"
-      WHERE "userId" = ${userId} AND "accountLabel" = ${accountLabel}
+      WHERE "userId" = ${userId} AND "accountId" = ${accountId}
     `),
     prisma.$queryRaw<AllocatedRow[]>(Prisma.sql`
       SELECT COALESCE(SUM(
@@ -114,7 +114,7 @@ export async function computeHeadroom(
       FROM "PocketMovement" m
       JOIN "Pocket" p ON p.id = m."pocketId"
       WHERE p."userId" = ${userId}
-        AND p."accountLabel" = ${accountLabel}
+        AND p."accountId" = ${accountId}
         ${excludePocketId ? Prisma.sql`AND p.id != ${excludePocketId}` : Prisma.sql``}
     `),
   ]);
@@ -130,7 +130,7 @@ export async function listPockets(userId: string): Promise<PocketSummaryDto[]> {
   const pockets = await prisma.pocket.findMany({
     where: { userId },
     include: { movements: true },
-    orderBy: [{ accountLabel: 'asc' }, { createdAt: 'asc' }],
+    orderBy: [{ accountId: 'asc' }, { createdAt: 'asc' }],
   });
 
   return pockets.map((p) => toPocketSummary(p, computeAllocated(p.movements)));
@@ -142,10 +142,19 @@ export async function createPocket(
   userId: string,
   input: CreatePocketInput,
 ): Promise<PocketSummaryDto> {
+  // Verify the account belongs to the user (owned or shared)
+  const account = await prisma.account.findFirst({
+    where: {
+      id: input.accountId,
+      OR: [{ ownerId: userId }, { viewers: { some: { userId } } }],
+    },
+  });
+  if (!account) throw new Error('ACCOUNT_NOT_FOUND');
+
   const pocket = await prisma.pocket.create({
     data: {
       userId,
-      accountLabel: input.accountLabel,
+      accountId: input.accountId,
       name: input.name.trim(),
       goalAmount: new Prisma.Decimal(input.goalAmount),
       color: input.color,
@@ -241,7 +250,7 @@ export async function createMovement(
   const currentAllocated = computeAllocated(pocket.movements);
 
   if (input.direction === 'ALLOCATION') {
-    const headroom = await computeHeadroom(userId, pocket.accountLabel);
+    const headroom = await computeHeadroom(userId, pocket.accountId);
     if (input.amount > headroom) {
       const err = new Error('INSUFFICIENT_HEADROOM');
       (err as Error & { headroom: number }).headroom = headroom;
@@ -265,7 +274,6 @@ export async function createMovement(
     },
   });
 
-  // Re-fetch updated allocated amount
   const updatedMovements = await prisma.pocketMovement.findMany({ where: { pocketId } });
   const newAllocated = computeAllocated(updatedMovements);
   return toPocketSummary(pocket, newAllocated);

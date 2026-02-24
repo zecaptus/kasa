@@ -1,7 +1,11 @@
+import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import { CsvDropzone } from '../components/CsvDropzone';
+import { ImportSessionMetadata } from '../components/ImportSessionMetadata';
 import { ImportSummary } from '../components/ImportSummary';
 import { TransactionList } from '../components/TransactionList';
+import { inputCls } from '../lib/inputCls';
+import { useSetAccountBalanceMutation } from '../services/bankAccountsApi';
 import {
   useGetSessionQuery,
   useGetSessionsQuery,
@@ -10,10 +14,92 @@ import {
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { setActiveSession } from '../store/importSlice';
 
+interface BalancePromptProps {
+  accountId: string;
+  onDone: () => void;
+}
+
+function BalancePrompt({ accountId, onDone }: BalancePromptProps) {
+  const intl = useIntl();
+  const today = new Date().toISOString().split('T')[0] as string;
+  const [amount, setAmount] = useState('');
+  const [date, setDate] = useState(today);
+  const [setBalance, { isLoading }] = useSetAccountBalanceMutation();
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const value = Number.parseFloat(amount.replace(',', '.'));
+    if (!Number.isNaN(value) && date) {
+      await setBalance({ id: accountId, balance: value, date });
+    }
+    onDone();
+  }
+
+  return (
+    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+      <p className="mb-1 text-sm font-medium text-amber-800 dark:text-amber-300">
+        {intl.formatMessage({ id: 'import.balance.prompt.title' })}
+      </p>
+      <p className="mb-3 text-xs text-amber-700 dark:text-amber-400">
+        {intl.formatMessage({ id: 'import.balance.prompt.description' })}
+      </p>
+      <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-wrap items-end gap-2">
+        <div className="flex-1 min-w-32">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-amber-700 dark:text-amber-400">
+              {intl.formatMessage({ id: 'import.balance.prompt.amount' })}
+            </span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0,00"
+              className={inputCls()}
+              required
+            />
+          </label>
+        </div>
+        <div className="flex-1 min-w-32">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-amber-700 dark:text-amber-400">
+              {intl.formatMessage({ id: 'import.balance.prompt.date' })}
+            </span>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className={inputCls()}
+              required
+            />
+          </label>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+          >
+            {intl.formatMessage({ id: 'import.balance.prompt.submit' })}
+          </button>
+          <button
+            type="button"
+            onClick={onDone}
+            className="rounded-lg px-3 py-2 text-sm text-amber-700 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/30"
+          >
+            {intl.formatMessage({ id: 'import.balance.prompt.skip' })}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 export function ImportPage() {
   const intl = useIntl();
   const dispatch = useAppDispatch();
   const activeSessionId = useAppSelector((s) => s.import.activeSessionId);
+  const [pendingBalanceAccountId, setPendingBalanceAccountId] = useState<string | null>(null);
 
   const [uploadCsv, { isLoading: isUploading, error: uploadError }] = useUploadCsvMutation();
   const { data: sessionsData } = useGetSessionsQuery({});
@@ -43,6 +129,9 @@ export function ImportPage() {
     const result = await uploadCsv(formData);
     if ('data' in result && result.data) {
       dispatch(setActiveSession(result.data.id));
+      if (result.data.balanceMissing && result.data.accountId) {
+        setPendingBalanceAccountId(result.data.accountId);
+      }
     }
   }
 
@@ -50,11 +139,16 @@ export function ImportPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-6 text-2xl font-semibold text-slate-900">
-        {intl.formatMessage({ id: 'import.page.title' })}
-      </h1>
+      <h1 className="mb-6 page-title">{intl.formatMessage({ id: 'import.page.title' })}</h1>
 
       <CsvDropzone onUpload={handleUpload} isUploading={isUploading} error={errorMessage} />
+
+      {pendingBalanceAccountId && (
+        <BalancePrompt
+          accountId={pendingBalanceAccountId}
+          onDone={() => setPendingBalanceAccountId(null)}
+        />
+      )}
 
       {activeSession && (
         <section className="mt-8">
@@ -91,6 +185,15 @@ export function ImportPage() {
             )}
           </div>
 
+          <ImportSessionMetadata
+            accountNumber={activeSession.accountNumber}
+            exportStartDate={activeSession.exportStartDate}
+            exportEndDate={activeSession.exportEndDate}
+            balance={activeSession.balance}
+            balanceDate={activeSession.balanceDate}
+            currency={activeSession.currency}
+          />
+
           <ImportSummary counts={activeSession.counts} />
 
           <div className="mt-4">
@@ -101,19 +204,21 @@ export function ImportPage() {
 
       {sessionsData && sessionsData.sessions.length > 0 && (
         <section className="mt-10">
-          <h2 className="mb-3 text-base font-medium text-slate-700">
+          <h2 className="mb-3 text-base font-medium text-slate-700 dark:text-slate-300">
             {intl.formatMessage({ id: 'import.sessions.title' })}
           </h2>
-          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-700 dark:bg-slate-900">
             {sessionsData.sessions.map((session) => (
               <li key={session.id}>
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-slate-50"
+                  className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50"
                   onClick={() => dispatch(setActiveSession(session.id))}
                 >
-                  <span className="text-sm font-medium text-slate-800">{session.filename}</span>
-                  <span className="text-sm text-slate-500">
+                  <span className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                    {session.filename}
+                  </span>
+                  <span className="text-sm text-slate-500 dark:text-slate-400">
                     {intl.formatDate(session.importedAt, {
                       day: '2-digit',
                       month: 'short',

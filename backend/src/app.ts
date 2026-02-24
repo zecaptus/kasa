@@ -3,11 +3,13 @@ import Router from '@koa/router';
 import Koa, { type Context, type Next } from 'koa';
 import { accountRouter } from './routes/account.router';
 import { authRouter } from './routes/auth.router';
+import bankAccountsRouter from './routes/bankAccounts.router';
 import categoriesRouter from './routes/categories.router';
 import dashboardRouter from './routes/dashboard.router';
 import expensesRouter from './routes/expenses.router';
 import importRouter from './routes/import.router';
 import pocketsRouter from './routes/pockets.router';
+import recurringPatternsRouter from './routes/recurringPatterns.router';
 import transactionsRouter from './routes/transactions.router';
 
 function createApp(): Koa {
@@ -53,6 +55,10 @@ function createApp(): Koa {
   app.use(dashboardRouter.allowedMethods());
   app.use(pocketsRouter.routes());
   app.use(pocketsRouter.allowedMethods());
+  app.use(bankAccountsRouter.routes());
+  app.use(bankAccountsRouter.allowedMethods());
+  app.use(recurringPatternsRouter.routes());
+  app.use(recurringPatternsRouter.allowedMethods());
 
   return app;
 }

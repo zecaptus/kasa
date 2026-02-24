@@ -9,12 +9,19 @@ export interface RecentTransactionDto {
   label: string;
   amount: number;
   direction: 'debit' | 'credit';
+  transferPeerAccountLabel: string | null;
 }
 
 export interface AccountSummaryDto {
+  accountId: string;
   label: string;
+  accountNumber: string;
+  isHidden: boolean;
   balance: number;
   monthlyVariation: number;
+  currentBalance: number | null;
+  balanceDate: string | null;
+  endOfMonthPrediction: number | null;
   recentTransactions: RecentTransactionDto[];
 }
 
@@ -49,10 +56,12 @@ export interface DashboardResponseDto {
 export const dashboardApi = createApi({
   reducerPath: 'dashboardApi',
   baseQuery: baseQueryWithReauth,
+  tagTypes: ['Dashboard'],
   endpoints: (builder) => ({
     getDashboard: builder.query<DashboardResponseDto, void>({
       query: () => '/dashboard',
       keepUnusedDataFor: 60,
+      providesTags: ['Dashboard'],
     }),
   }),
 });

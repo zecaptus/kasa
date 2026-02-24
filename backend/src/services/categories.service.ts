@@ -1,6 +1,10 @@
 import { type Category, type CategoryRule, prisma } from '@kasa/db';
 import { invalidateRuleCache } from './categorization.service.js';
 
+export interface CategoryRuleWithCount extends CategoryRule {
+  transactionCount: number;
+}
+
 // ─── Categories ───────────────────────────────────────────────────────────────
 
 export async function listCategories(userId: string): Promise<Category[]> {
@@ -76,10 +80,15 @@ export async function deleteCategory(
 
 // ─── CategoryRules ────────────────────────────────────────────────────────────
 
-export async function listCategoryRules(userId: string): Promise<CategoryRule[]> {
-  return prisma.categoryRule.findMany({
+export async function listCategoryRules(userId: string): Promise<CategoryRuleWithCount[]> {
+  const rules = await prisma.categoryRule.findMany({
     where: { OR: [{ isSystem: true }, { userId }] },
     orderBy: [{ isSystem: 'asc' }, { createdAt: 'asc' }],
+    include: { _count: { select: { transactions: true } } },
+  });
+  return rules.map((r) => {
+    const { _count, ...rule } = r;
+    return { ...rule, transactionCount: _count.transactions };
   });
 }
 

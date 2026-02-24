@@ -88,4 +88,5 @@ pnpm --filter @kasa/db run db:generate  # regenerate Prisma client
 - Frontend API calls go through `src/services/` — no raw `fetch` in components or hooks.
 - Frontend imports Prisma types via `import type { ... } from '@kasa/db'` — never imports `prisma` client.
 - Constitution lives at `.specify/memory/constitution.md` (v1.2.0) — 4 principles: Code Quality, Testing Standards, UX Consistency, Performance.
+- **Global loading indicator** : Toutes les requêtes API (RTK Query) doivent mettre le logo Kasa en état « loading » pendant leur exécution. Le composant `KasaLogo` accepte une prop `spinning?: boolean` pour animer le logo. Le hook `useIsFetching()` de RTK Query est utilisé dans `NavBar` pour détecter toute requête en cours et transmettre `spinning` au logo.
 <!-- MANUAL ADDITIONS END -->

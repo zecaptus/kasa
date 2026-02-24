@@ -1,8 +1,10 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { authApi } from '../services/authApi';
+import { bankAccountsApi } from '../services/bankAccountsApi';
 import { dashboardApi } from '../services/dashboardApi';
 import { importApi } from '../services/importApi';
 import { pocketsApi } from '../services/pocketsApi';
+import { recurringPatternsApi } from '../services/recurringPatternsApi';
 import { transactionsApi } from '../services/transactionsApi';
 import authReducer from './authSlice';
 import importReducer from './importSlice';
@@ -18,6 +20,8 @@ export const store = configureStore({
     [transactionsApi.reducerPath]: transactionsApi.reducer,
     [dashboardApi.reducerPath]: dashboardApi.reducer,
     [pocketsApi.reducerPath]: pocketsApi.reducer,
+    [bankAccountsApi.reducerPath]: bankAccountsApi.reducer,
+    [recurringPatternsApi.reducerPath]: recurringPatternsApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -26,6 +30,8 @@ export const store = configureStore({
       transactionsApi.middleware,
       dashboardApi.middleware,
       pocketsApi.middleware,
+      bankAccountsApi.middleware,
+      recurringPatternsApi.middleware,
     ),
 });
 

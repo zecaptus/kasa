@@ -23,6 +23,8 @@ export interface CategoryRuleDto {
   isSystem: boolean;
   userId: string | null;
   createdAt: string;
+  categorized?: number;
+  transactionCount?: number;
 }
 
 export interface UnifiedTransactionDto {
@@ -37,6 +39,9 @@ export interface UnifiedTransactionDto {
   categoryId: string | null;
   categorySource: CategorySource;
   category: CategoryDto | null;
+  recurringPatternId: string | null;
+  transferPeerId: string | null;
+  transferPeerAccountLabel: string | null;
 }
 
 export interface TransactionTotals {
@@ -58,6 +63,12 @@ export interface ListTransactionsParams {
   categoryId?: string;
   direction?: 'debit' | 'credit';
   search?: string;
+  accountId?: string;
+}
+
+export interface RuleSuggestionDto {
+  keyword: string;
+  matchCount: number;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -70,6 +81,7 @@ export function buildTransactionParams(p: ListTransactionsParams): Record<string
   if (p.categoryId) params.categoryId = p.categoryId;
   if (p.direction) params.direction = p.direction;
   if (p.search) params.search = p.search;
+  if (p.accountId) params.accountId = p.accountId;
   return params;
 }
 
@@ -101,6 +113,18 @@ export const transactionsApi = createApi({
         url: `/transactions/${id}/category`,
         method: 'PATCH',
         body: { categoryId },
+      }),
+      invalidatesTags: ['Transaction'],
+    }),
+
+    updateTransactionRecurring: builder.mutation<
+      UnifiedTransactionDto,
+      { id: string; recurringPatternId: string | null }
+    >({
+      query: ({ id, recurringPatternId }) => ({
+        url: `/transactions/${id}/recurring`,
+        method: 'PATCH',
+        body: { recurringPatternId },
       }),
       invalidatesTags: ['Transaction'],
     }),
@@ -147,7 +171,7 @@ export const transactionsApi = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['CategoryRule'],
+      invalidatesTags: ['CategoryRule', 'Transaction'],
     }),
 
     updateCategoryRule: builder.mutation<
@@ -159,7 +183,7 @@ export const transactionsApi = createApi({
         method: 'PATCH',
         body,
       }),
-      invalidatesTags: ['CategoryRule'],
+      invalidatesTags: ['CategoryRule', 'Transaction'],
     }),
 
     deleteCategoryRule: builder.mutation<void, string>({
@@ -169,6 +193,16 @@ export const transactionsApi = createApi({
       }),
       invalidatesTags: ['CategoryRule'],
     }),
+
+    recategorizeAll: builder.mutation<{ categorized: number }, void>({
+      query: () => ({ url: '/categories/recategorize-all', method: 'POST' }),
+      invalidatesTags: ['Transaction', 'CategoryRule'],
+    }),
+
+    listRuleSuggestions: builder.query<{ suggestions: RuleSuggestionDto[] }, void>({
+      query: () => '/categories/suggestions',
+      providesTags: ['CategoryRule'],
+    }),
   }),
 });
 
@@ -176,6 +210,7 @@ export const {
   useListTransactionsQuery,
   useGetTransactionQuery,
   useUpdateTransactionCategoryMutation,
+  useUpdateTransactionRecurringMutation,
   useListCategoriesQuery,
   useCreateCategoryMutation,
   useUpdateCategoryMutation,
@@ -184,4 +219,6 @@ export const {
   useCreateCategoryRuleMutation,
   useUpdateCategoryRuleMutation,
   useDeleteCategoryRuleMutation,
+  useRecategorizeAllMutation,
+  useListRuleSuggestionsQuery,
 } = transactionsApi;

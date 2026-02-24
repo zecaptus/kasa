@@ -5,29 +5,40 @@ import {
   getTransactionById,
   listTimeline,
   updateTransactionCategory,
+  updateTransactionRecurring,
 } from '../services/timeline.service.js';
 
 const router = new Router({ prefix: '/api/transactions' });
 
 router.use(requireAuth);
 
+function str(v: unknown): string | undefined {
+  return typeof v === 'string' ? v : undefined;
+}
+
+function parseListParams(q: Router.RouterContext['query']) {
+  const d = q.direction;
+  const direction: 'debit' | 'credit' | undefined = d === 'debit' || d === 'credit' ? d : undefined;
+  return {
+    limit: Math.min(Number(q.limit ?? 50), 200),
+    rawCursor: str(q.cursor),
+    from: str(q.from),
+    to: str(q.to),
+    categoryId: str(q.categoryId),
+    direction,
+    search: str(q.search)?.trim() || undefined,
+    accountId: str(q.accountId),
+  };
+}
+
 // GET /api/transactions
 router.get('/', async (ctx: Router.RouterContext) => {
   const userId = ctx.state.user.sub as string;
-  const limit = Math.min(Number(ctx.query.limit ?? 50), 200);
-  const rawCursor = typeof ctx.query.cursor === 'string' ? ctx.query.cursor : undefined;
-  const from = typeof ctx.query.from === 'string' ? ctx.query.from : undefined;
-  const to = typeof ctx.query.to === 'string' ? ctx.query.to : undefined;
-  const categoryId = typeof ctx.query.categoryId === 'string' ? ctx.query.categoryId : undefined;
-  const directionRaw = ctx.query.direction;
-  const direction =
-    directionRaw === 'debit' || directionRaw === 'credit' ? directionRaw : undefined;
-  const search = typeof ctx.query.search === 'string' ? ctx.query.search.trim() : undefined;
+  const { limit, rawCursor, from, to, categoryId, direction, search, accountId } = parseListParams(
+    ctx.query,
+  );
 
-  let cursor: ReturnType<typeof decodeCursor> | undefined;
-  if (rawCursor) {
-    cursor = decodeCursor(rawCursor);
-  }
+  const cursor = rawCursor ? decodeCursor(rawCursor) : undefined;
 
   const result = await listTimeline(userId, {
     limit,
@@ -36,7 +47,8 @@ router.get('/', async (ctx: Router.RouterContext) => {
     to,
     categoryId,
     direction,
-    search: search || undefined,
+    search,
+    accountId,
   });
 
   ctx.body = {
@@ -92,6 +104,41 @@ router.patch('/:id/category', async (ctx: Router.RouterContext) => {
   }
 
   const updated = await updateTransactionCategory(userId, id, categoryId);
+  if (!updated) {
+    ctx.status = 404;
+    ctx.body = { error: 'NOT_FOUND' };
+    return;
+  }
+
+  ctx.body = {
+    ...updated,
+    date: updated.date.toISOString().split('T')[0],
+    amount: Number(updated.amount),
+  };
+});
+
+// PATCH /api/transactions/:id/recurring
+router.patch('/:id/recurring', async (ctx: Router.RouterContext) => {
+  const userId = ctx.state.user.sub as string;
+  const { id } = ctx.params as { id: string };
+  const body = ctx.request.body as { recurringPatternId?: unknown };
+  const recurringPatternId =
+    body?.recurringPatternId === null
+      ? null
+      : typeof body?.recurringPatternId === 'string'
+        ? body.recurringPatternId
+        : undefined;
+
+  if (recurringPatternId === undefined) {
+    ctx.status = 400;
+    ctx.body = {
+      error: 'VALIDATION_ERROR',
+      message: 'recurringPatternId must be a string or null',
+    };
+    return;
+  }
+
+  const updated = await updateTransactionRecurring(userId, id, recurringPatternId);
   if (!updated) {
     ctx.status = 404;
     ctx.body = { error: 'NOT_FOUND' };

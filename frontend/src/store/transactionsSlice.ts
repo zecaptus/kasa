@@ -6,6 +6,7 @@ export interface TransactionFilters {
   categoryId: string | undefined;
   direction: 'debit' | 'credit' | undefined;
   search: string;
+  accountId: string | undefined;
 }
 
 export interface TransactionsState {
@@ -19,6 +20,7 @@ const initialState: TransactionsState = {
     categoryId: undefined,
     direction: undefined,
     search: '',
+    accountId: undefined,
   },
 };
 

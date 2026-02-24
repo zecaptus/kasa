@@ -3,14 +3,14 @@ CREATE TYPE "PocketMovementDir" AS ENUM ('ALLOCATION', 'WITHDRAWAL');
 
 -- CreateTable: Pocket
 CREATE TABLE "Pocket" (
-    "id"           TEXT          NOT NULL,
-    "userId"       TEXT          NOT NULL,
-    "accountLabel" TEXT          NOT NULL,
-    "name"         VARCHAR(100)  NOT NULL,
-    "goalAmount"   DECIMAL(12,2) NOT NULL,
-    "color"        TEXT          NOT NULL DEFAULT '#94a3b8',
-    "createdAt"    TIMESTAMP(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt"    TIMESTAMP(3)  NOT NULL,
+    "id"          TEXT          NOT NULL,
+    "userId"      TEXT          NOT NULL,
+    "accountId"   TEXT          NOT NULL,
+    "name"        VARCHAR(100)  NOT NULL,
+    "goalAmount"  DECIMAL(12,2) NOT NULL,
+    "color"       TEXT          NOT NULL DEFAULT '#94a3b8',
+    "createdAt"   TIMESTAMP(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt"   TIMESTAMP(3)  NOT NULL,
 
     CONSTRAINT "Pocket_pkey" PRIMARY KEY ("id")
 );
@@ -33,6 +33,11 @@ ALTER TABLE "Pocket"
     ADD CONSTRAINT "Pocket_userId_fkey"
     FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+-- FK: Pocket → Account
+ALTER TABLE "Pocket"
+    ADD CONSTRAINT "Pocket_accountId_fkey"
+    FOREIGN KEY ("accountId") REFERENCES "Account"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
 -- FK: PocketMovement → Pocket
 ALTER TABLE "PocketMovement"
     ADD CONSTRAINT "PocketMovement_pocketId_fkey"
@@ -40,6 +45,6 @@ ALTER TABLE "PocketMovement"
 
 -- Indexes
 CREATE INDEX "Pocket_userId_idx" ON "Pocket"("userId");
-CREATE INDEX "Pocket_userId_accountLabel_idx" ON "Pocket"("userId", "accountLabel");
+CREATE INDEX "Pocket_accountId_idx" ON "Pocket"("accountId");
 CREATE INDEX "PocketMovement_pocketId_idx" ON "PocketMovement"("pocketId");
 CREATE INDEX "PocketMovement_pocketId_date_idx" ON "PocketMovement"("pocketId", "date");

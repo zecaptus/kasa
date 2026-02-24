@@ -25,6 +25,9 @@ export interface UnifiedTransaction {
   categoryId: string | null;
   categorySource: CategorySource;
   category: CategoryInfo | null;
+  recurringPatternId: string | null;
+  transferPeerId: string | null;
+  transferPeerAccountLabel: string | null;
 }
 
 export interface TimelineCursor {
@@ -40,6 +43,7 @@ export interface ListTimelineOptions {
   categoryId: string | undefined;
   direction: 'debit' | 'credit' | undefined;
   search: string | undefined;
+  accountId: string | undefined;
 }
 
 export interface TimelineTotals {
@@ -64,6 +68,9 @@ interface UnifiedRow {
   cat_slug: string | null;
   cat_color: string | null;
   cat_is_system: boolean | null;
+  recurring_pattern_id: string | null;
+  transfer_peer_id: string | null;
+  transfer_peer_account_label: string | null;
 }
 
 interface TotalsRow {
@@ -145,6 +152,8 @@ interface FilterClauses {
   meSearchClause: Prisma.Sql;
   itCategoryClause: Prisma.Sql;
   meCategoryClause: Prisma.Sql;
+  itAccountClause: Prisma.Sql;
+  meAccountGuard: Prisma.Sql;
 }
 
 function buildFilterClauses(options: ListTimelineOptions): FilterClauses {
@@ -171,6 +180,10 @@ function buildFilterClauses(options: ListTimelineOptions): FilterClauses {
     meSearchClause: searchStr ? Prisma.sql`AND me."label" ILIKE ${searchStr}` : Prisma.empty,
     itCategoryClause: buildItCategoryClause(options.categoryId),
     meCategoryClause: buildMeCategoryClause(options.categoryId),
+    itAccountClause: options.accountId
+      ? Prisma.sql`AND it."accountId" = ${options.accountId}`
+      : Prisma.empty,
+    meAccountGuard: options.accountId ? Prisma.sql`AND FALSE` : Prisma.empty,
   };
 }
 
@@ -199,9 +212,14 @@ export async function listTimeline(
       c."name"                                      AS "cat_name",
       c."slug"                                      AS "cat_slug",
       c."color"                                     AS "cat_color",
-      c."isSystem"                                  AS "cat_is_system"
+      c."isSystem"                                  AS "cat_is_system",
+      it."recurringPatternId"                       AS "recurring_pattern_id",
+      it."transferPeerId"                           AS "transfer_peer_id",
+      peer_acc."label"                              AS "transfer_peer_account_label"
     FROM "ImportedTransaction" it
     LEFT JOIN "Category" c ON c."id" = it."categoryId"
+    LEFT JOIN "ImportedTransaction" peer_tx ON peer_tx."id" = it."transferPeerId"
+    LEFT JOIN "Account" peer_acc ON peer_acc."id" = peer_tx."accountId"
     WHERE it."userId" = ${userId}
       ${itCursorClause}
       ${f.itFromClause}
@@ -209,6 +227,7 @@ export async function listTimeline(
       ${f.itDirectionClause}
       ${f.itSearchClause}
       ${f.itCategoryClause}
+      ${f.itAccountClause}
 
     UNION ALL
 
@@ -226,7 +245,10 @@ export async function listTimeline(
       c."name"                                      AS "cat_name",
       c."slug"                                      AS "cat_slug",
       c."color"                                     AS "cat_color",
-      c."isSystem"                                  AS "cat_is_system"
+      c."isSystem"                                  AS "cat_is_system",
+      NULL::text                                    AS "recurring_pattern_id",
+      NULL::text                                    AS "transfer_peer_id",
+      NULL::text                                    AS "transfer_peer_account_label"
     FROM "ManualExpense" me
     LEFT JOIN "Category" c ON c."id" = me."categoryId"
     WHERE me."userId" = ${userId}
@@ -236,6 +258,7 @@ export async function listTimeline(
       ${f.meDirectionGuard}
       ${f.meSearchClause}
       ${f.meCategoryClause}
+      ${f.meAccountGuard}
 
     ORDER BY "date" DESC, "id" ASC
     LIMIT ${take}
@@ -273,6 +296,9 @@ export async function listTimeline(
             isSystem: row.cat_is_system ?? false,
           }
         : null,
+    recurringPatternId: row.recurring_pattern_id,
+    transferPeerId: row.transfer_peer_id,
+    transferPeerAccountLabel: row.transfer_peer_account_label,
   }));
 
   // Compute totals for the filtered set (all pages, not just current)
@@ -304,6 +330,7 @@ async function getTimelineTotals(
         ${f.itDirectionClause}
         ${f.itSearchClause}
         ${f.itCategoryClause}
+        ${f.itAccountClause}
 
       UNION ALL
 
@@ -315,6 +342,7 @@ async function getTimelineTotals(
         ${f.meDirectionGuard}
         ${f.meSearchClause}
         ${f.meCategoryClause}
+        ${f.meAccountGuard}
     ) src
   `;
 
@@ -333,7 +361,7 @@ export async function getTransactionById(
 ): Promise<UnifiedTransaction | null> {
   const it = await prisma.importedTransaction.findFirst({
     where: { id, userId },
-    include: { category: true },
+    include: { category: true, transferPeer: { include: { account: true } } },
   });
 
   if (it) {
@@ -357,6 +385,9 @@ export async function getTransactionById(
             isSystem: it.category.isSystem,
           }
         : null,
+      recurringPatternId: it.recurringPatternId,
+      transferPeerId: it.transferPeerId,
+      transferPeerAccountLabel: it.transferPeer?.account.label ?? null,
     };
   }
 
@@ -386,10 +417,39 @@ export async function getTransactionById(
             isSystem: me.category.isSystem,
           }
         : null,
+      recurringPatternId: null,
+      transferPeerId: null,
+      transferPeerAccountLabel: null,
     };
   }
 
   return null;
+}
+
+// ─── updateTransactionRecurring ──────────────────────────────────────────────
+
+export async function updateTransactionRecurring(
+  userId: string,
+  id: string,
+  recurringPatternId: string | null,
+): Promise<UnifiedTransaction | null> {
+  // Only ImportedTransaction supports recurringPatternId
+  const it = await prisma.importedTransaction.findFirst({ where: { id, userId } });
+  if (!it) return null;
+
+  // Verify the pattern belongs to the user (if not null)
+  if (recurringPatternId !== null) {
+    const pattern = await prisma.recurringPattern.findFirst({
+      where: { id: recurringPatternId, userId },
+    });
+    if (!pattern) return null;
+  }
+
+  await prisma.importedTransaction.update({
+    where: { id },
+    data: { recurringPatternId },
+  });
+  return getTransactionById(userId, id);
 }
 
 // ─── updateTransactionCategory ───────────────────────────────────────────────

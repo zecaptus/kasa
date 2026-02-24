@@ -28,9 +28,10 @@ export function PocketCard({ pocket, onAddMovement, onEdit, onDelete, compact = 
 
   return (
     <div
-      className={cn('rounded-xl border bg-white p-4 shadow-sm', {
-        'border-slate-100': !isGoalReached,
-        'border-emerald-200 bg-emerald-50': isGoalReached,
+      className={cn('rounded-xl border p-4 shadow-sm', {
+        'border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900': !isGoalReached,
+        'border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30':
+          isGoalReached,
       })}
     >
       {/* Header */}
@@ -41,7 +42,9 @@ export function PocketCard({ pocket, onAddMovement, onEdit, onDelete, compact = 
             style={{ backgroundColor: pocket.color }}
             aria-hidden
           />
-          <span className="font-medium text-slate-800 text-sm">{pocket.name}</span>
+          <span className="font-medium text-slate-800 text-sm dark:text-slate-100">
+            {pocket.name}
+          </span>
         </div>
         {isGoalReached && <span className="text-xs font-semibold text-emerald-600">✓</span>}
       </div>
@@ -53,7 +56,7 @@ export function PocketCard({ pocket, onAddMovement, onEdit, onDelete, compact = 
         aria-valuemin={0}
         aria-valuemax={100}
         aria-label={`${pocket.name} — ${Math.round(pocket.progressPct)} %`}
-        className="mb-2 h-2 w-full overflow-hidden rounded-full bg-slate-100"
+        className="mb-2 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700"
       >
         <div
           className="h-full rounded-full transition-all"
@@ -62,7 +65,7 @@ export function PocketCard({ pocket, onAddMovement, onEdit, onDelete, compact = 
       </div>
 
       {/* Ratio */}
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-slate-500 dark:text-slate-400">
         {formattedAllocated} / {formattedGoal}
       </p>
 
@@ -73,7 +76,7 @@ export function PocketCard({ pocket, onAddMovement, onEdit, onDelete, compact = 
             <button
               type="button"
               onClick={() => onAddMovement(pocket)}
-              className="rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
+              className="rounded-md bg-kasa-accent/10 px-2 py-1 text-xs font-medium text-kasa-accent hover:bg-kasa-accent/20 dark:bg-kasa-accent/15 dark:hover:bg-kasa-accent/25"
             >
               {intl.formatMessage({ id: 'pockets.movement.add' })}
             </button>
@@ -82,7 +85,7 @@ export function PocketCard({ pocket, onAddMovement, onEdit, onDelete, compact = 
             <button
               type="button"
               onClick={() => onEdit(pocket)}
-              className="rounded-md px-2 py-1 text-xs text-slate-500 hover:bg-slate-100"
+              className="rounded-md px-2 py-1 text-xs text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
             >
               {intl.formatMessage({ id: 'pockets.edit' })}
             </button>
@@ -91,7 +94,7 @@ export function PocketCard({ pocket, onAddMovement, onEdit, onDelete, compact = 
             <button
               type="button"
               onClick={() => onDelete(pocket)}
-              className="rounded-md px-2 py-1 text-xs text-red-500 hover:bg-red-50"
+              className="rounded-md px-2 py-1 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
             >
               {intl.formatMessage({ id: 'pockets.delete' })}
             </button>

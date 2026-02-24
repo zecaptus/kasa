@@ -9,6 +9,8 @@ import {
 import { bulkCategorizeTransactions } from './categorization.service.js';
 import { parseSgCsv } from './csvParser.service.js';
 import { runReconciliation } from './reconciliation.service.js';
+import { detectRecurringPatterns } from './recurringPatterns.service.js';
+import { detectTransferPairs } from './transferDetection.service.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,6 +26,7 @@ export interface ImportCsvResult {
   session: ImportSession & { transactions: ImportedTransaction[]; counts: ReconciliationCounts };
   newCount: number;
   skippedCount: number;
+  balanceMissing: boolean;
 }
 
 export interface CreateExpenseInput {
@@ -54,6 +57,58 @@ function computeCounts(transactions: ImportedTransaction[]): ReconciliationCount
   };
 }
 
+// ─── Helper: getOrCreateAccount ───────────────────────────────────────────────
+
+async function getOrCreateAccount(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  accountNumber: string,
+): Promise<string> {
+  const existing = await tx.account.findUnique({
+    where: { ownerId_accountNumber: { ownerId: userId, accountNumber } },
+  });
+
+  if (existing) return existing.id;
+
+  const created = await tx.account.create({
+    data: {
+      ownerId: userId,
+      accountNumber,
+      label: accountNumber, // Default label = account number
+    },
+  });
+
+  return created.id;
+}
+
+// ─── Helper: insertTransactionsWithDedupe ─────────────────────────────────────
+
+type TransactionInsertRow = Omit<
+  Prisma.ImportedTransactionCreateManyInput,
+  'sessionId' | 'accountId'
+>;
+
+async function insertTransactionsWithDedupe(
+  tx: Prisma.TransactionClient,
+  sessionId: string,
+  accountId: string,
+  toInsert: TransactionInsertRow[],
+): Promise<{ transactions: ImportedTransaction[]; newCount: number }> {
+  // Use createMany with skipDuplicates for better performance (avoids timeout)
+  const result = await tx.importedTransaction.createMany({
+    data: toInsert.map((data) => ({ ...data, sessionId, accountId })),
+    skipDuplicates: true,
+  });
+
+  // Fetch the created transactions to return them
+  const createdTransactions = await tx.importedTransaction.findMany({
+    where: { sessionId },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  return { transactions: createdTransactions, newCount: result.count };
+}
+
 // ─── importCsv ────────────────────────────────────────────────────────────────
 
 export async function importCsv(
@@ -63,52 +118,70 @@ export async function importCsv(
 ): Promise<ImportCsvResult> {
   const parsed = await parseSgCsv(buffer, filename);
 
-  // Build transaction create inputs
-  const toInsert: Prisma.ImportedTransactionCreateManySessionInput[] = parsed.map((tx) => ({
+  // accountNumber from CSV metadata or fall back to a label derived from filename
+  const accountNumber =
+    parsed.metadata.accountNumber ??
+    parsed.transactions[0]?.accountLabel ??
+    filename.replace(/\.csv$/i, '');
+
+  // Build transaction create inputs (accountId filled in the transaction body below)
+  const toInsert = parsed.transactions.map((t) => ({
     userId,
-    accountingDate: tx.accountingDate,
-    valueDate: tx.valueDate ?? null,
-    label: tx.label,
-    detail: tx.detail ?? null,
-    debit: tx.debit !== null ? new Prisma.Decimal(tx.debit) : null,
-    credit: tx.credit !== null ? new Prisma.Decimal(tx.credit) : null,
-    accountLabel: tx.accountLabel,
+    accountingDate: t.accountingDate,
+    valueDate: t.valueDate ?? null,
+    label: t.label,
+    detail: t.detail ?? null,
+    debit: t.debit !== null ? new Prisma.Decimal(t.debit) : null,
+    credit: t.credit !== null ? new Prisma.Decimal(t.credit) : null,
     status: 'UNRECONCILED' as ReconciliationStatus,
   }));
 
   // Create session and attempt to insert transactions, skipping duplicates
-  const session = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    const created = await tx.importSession.create({
-      data: { userId, filename },
-    });
+  const session = await prisma.$transaction(
+    async (tx: Prisma.TransactionClient) => {
+      const accountId = await getOrCreateAccount(tx, userId, accountNumber);
 
-    let newCount = 0;
-    const createdTransactions: ImportedTransaction[] = [];
+      const created = await tx.importSession.create({
+        data: {
+          userId,
+          accountId,
+          filename,
+          exportStartDate: parsed.metadata.exportStartDate,
+          exportEndDate: parsed.metadata.exportEndDate,
+          transactionCount: parsed.metadata.transactionCount,
+          balanceDate: parsed.metadata.balanceDate,
+          balance:
+            parsed.metadata.balance !== null ? new Prisma.Decimal(parsed.metadata.balance) : null,
+          currency: parsed.metadata.currency,
+        },
+      });
 
-    for (const data of toInsert) {
-      try {
-        const t = await tx.importedTransaction.create({
-          data: { ...data, sessionId: created.id },
+      const { transactions, newCount } = await insertTransactionsWithDedupe(
+        tx,
+        created.id,
+        accountId,
+        toInsert,
+      );
+
+      // Update account balance snapshot when CSV provides it
+      if (parsed.metadata.balance !== null) {
+        const balanceDate =
+          parsed.metadata.balanceDate ?? parsed.metadata.exportEndDate ?? new Date();
+        await tx.account.update({
+          where: { id: accountId },
+          data: {
+            lastKnownBalance: new Prisma.Decimal(parsed.metadata.balance),
+            lastKnownBalanceDate: balanceDate,
+          },
         });
-        createdTransactions.push(t);
-        newCount++;
-      } catch (err: unknown) {
-        // Unique constraint violation (P2002) = duplicate → skip
-        if (
-          typeof err === 'object' &&
-          err !== null &&
-          'code' in err &&
-          (err as { code: string }).code !== 'P2002'
-        ) {
-          throw err;
-        }
       }
-    }
 
-    return { session: created, newCount, transactions: createdTransactions };
-  });
+      return { session: created, newCount, transactions };
+    },
+    { timeout: 30000 },
+  );
 
-  const skippedCount = parsed.length - session.newCount;
+  const skippedCount = parsed.transactions.length - session.newCount;
 
   // Trigger reconciliation after import (Q1: runs after every import)
   await runReconciliation(userId);
@@ -123,12 +196,19 @@ export async function importCsv(
     })),
   );
 
+  // Detect recurring patterns after import
+  await detectRecurringPatterns(userId);
+
+  // Detect internal transfer pairs (VIR EMIS ↔ VIR RECU across accounts)
+  await detectTransferPairs(userId);
+
   const counts = computeCounts(session.transactions);
 
   return {
     session: { ...session.session, transactions: session.transactions, counts },
     newCount: session.newCount,
     skippedCount,
+    balanceMissing: parsed.metadata.balance === null,
   };
 }
 

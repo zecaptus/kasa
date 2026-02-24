@@ -13,7 +13,7 @@ export function CategoryPicker({ value, onChange, disabled }: CategoryPickerProp
   const { data, isLoading } = useListCategoriesQuery();
 
   if (isLoading) {
-    return <div className="h-9 animate-pulse rounded-xl bg-slate-100" />;
+    return <div className="h-9 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-700" />;
   }
 
   const categories = data?.categories ?? [];

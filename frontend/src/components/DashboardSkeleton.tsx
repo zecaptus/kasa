@@ -1,10 +1,12 @@
 function SkeletonBlock({ className }: { className?: string }) {
-  return <div className={`animate-pulse rounded-lg bg-slate-200 ${className ?? ''}`} />;
+  return (
+    <div className={`animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700 ${className ?? ''}`} />
+  );
 }
 
 function SummaryCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <SkeletonBlock className="mb-4 h-5 w-32" />
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
@@ -21,7 +23,7 @@ function SummaryCardSkeleton() {
 
 function AccountCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-3 flex items-start justify-between">
         <SkeletonBlock className="h-4 w-28" />
         <SkeletonBlock className="h-4 w-16" />
@@ -42,7 +44,7 @@ function AccountCardSkeleton() {
 
 function ChartSkeleton() {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <SkeletonBlock className="mb-4 h-5 w-48" />
       <SkeletonBlock className="h-64 w-full" />
     </div>

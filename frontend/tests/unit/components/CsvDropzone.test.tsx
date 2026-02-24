@@ -55,7 +55,7 @@ describe('CsvDropzone', () => {
     const zone = screen.getByRole('button');
 
     fireEvent.dragOver(zone, { preventDefault: () => {} });
-    expect(zone.className).toContain('border-blue-400');
+    expect(zone.className).toContain('border-kasa-accent/60');
   });
 
   it('handles drag leave event', () => {
@@ -65,7 +65,7 @@ describe('CsvDropzone', () => {
 
     fireEvent.dragOver(zone);
     fireEvent.dragLeave(zone);
-    expect(zone.className).not.toContain('border-blue-400');
+    expect(zone.className).not.toContain('border-kasa-accent/60');
   });
 
   it('handles drop event with file', () => {

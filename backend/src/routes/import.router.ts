@@ -31,6 +31,7 @@ router.post('/csv', uploadMiddleware, async (ctx: Router.RouterContext) => {
       ...result.session,
       newCount: result.newCount,
       skippedCount: result.skippedCount,
+      balanceMissing: result.balanceMissing,
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'UNKNOWN_ERROR';

@@ -10,6 +10,12 @@ import {
   updateCategory,
   updateCategoryRule,
 } from '../services/categories.service.js';
+import {
+  invalidateRuleCache,
+  recategorizeAll,
+  recategorizeUncategorized,
+} from '../services/categorization.service.js';
+import { suggestRules } from '../services/ruleSuggestions.service.js';
 
 const router = new Router({ prefix: '/api/categories' });
 
@@ -96,6 +102,20 @@ router.delete('/:id', async (ctx: Router.RouterContext) => {
 
 // ─── Rules ────────────────────────────────────────────────────────────────────
 
+// GET /api/categories/suggestions
+router.get('/suggestions', async (ctx: Router.RouterContext) => {
+  const userId = ctx.state.user.sub as string;
+  ctx.body = { suggestions: await suggestRules(userId) };
+});
+
+// POST /api/categories/recategorize-all
+router.post('/recategorize-all', async (ctx: Router.RouterContext) => {
+  const userId = ctx.state.user.sub as string;
+  invalidateRuleCache(userId);
+  const categorized = await recategorizeAll(userId);
+  ctx.body = { categorized };
+});
+
 // GET /api/categories/rules
 router.get('/rules', async (ctx: Router.RouterContext) => {
   const userId = ctx.state.user.sub as string;
@@ -127,8 +147,10 @@ router.post('/rules', async (ctx: Router.RouterContext) => {
   }
 
   const rule = await createCategoryRule(userId, keyword, categoryId);
+  invalidateRuleCache(userId);
+  const categorized = await recategorizeUncategorized(userId);
   ctx.status = 201;
-  ctx.body = rule;
+  ctx.body = { ...rule, categorized };
 });
 
 // PATCH /api/categories/rules/:id
@@ -148,7 +170,9 @@ router.patch('/rules/:id', async (ctx: Router.RouterContext) => {
     return;
   }
 
-  ctx.body = rule;
+  invalidateRuleCache(userId);
+  const categorized = await recategorizeUncategorized(userId);
+  ctx.body = { ...rule, categorized };
 });
 
 // DELETE /api/categories/rules/:id

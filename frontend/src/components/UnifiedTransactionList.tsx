@@ -27,7 +27,7 @@ function TransactionItem({ tx, onSelect }: TransactionItemProps) {
   return (
     <li
       className={cn('flex items-center gap-3 px-4 py-3', {
-        'cursor-pointer hover:bg-slate-50': onSelect !== undefined,
+        'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50': onSelect !== undefined,
       })}
       onClick={() => onSelect?.(tx)}
       onKeyDown={(e) => {
@@ -37,8 +37,12 @@ function TransactionItem({ tx, onSelect }: TransactionItemProps) {
       tabIndex={onSelect ? 0 : undefined}
     >
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-slate-900">{tx.label}</p>
-        {tx.detail && <p className="truncate text-xs text-slate-500">{tx.detail}</p>}
+        <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
+          {tx.label}
+        </p>
+        {tx.detail && (
+          <p className="truncate text-xs text-slate-500 dark:text-slate-400">{tx.detail}</p>
+        )}
         <p className="text-xs text-slate-400">
           {intl.formatDate(tx.date, { day: '2-digit', month: 'short', year: 'numeric' })}
         </p>
@@ -54,16 +58,33 @@ function TransactionItem({ tx, onSelect }: TransactionItemProps) {
           {isDebit ? '-' : '+'}
           {formattedAmount}
         </p>
-        <span className="flex items-center gap-1 text-xs text-slate-600">
+        <span className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400">
           <span
             className="inline-block size-2 shrink-0 rounded-full"
             style={{ backgroundColor: tx.category?.color ?? '#94a3b8' }}
           />
           {tx.category?.name ?? intl.formatMessage({ id: 'transactions.category.none' })}
         </span>
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-          {intl.formatMessage({ id: sourceId })}
-        </span>
+        <div className="flex items-center gap-1">
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+            {intl.formatMessage({ id: sourceId })}
+          </span>
+          {tx.recurringPatternId !== null && (
+            <span
+              className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+              title={intl.formatMessage({ id: 'recurring.badge' })}
+            >
+              {intl.formatMessage({ id: 'recurring.badge' })}
+            </span>
+          )}
+          {tx.transferPeerAccountLabel !== null && (
+            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
+              {tx.direction === 'debit'
+                ? `→ ${tx.transferPeerAccountLabel}`
+                : `← ${tx.transferPeerAccountLabel}`}
+            </span>
+          )}
+        </div>
       </div>
     </li>
   );
@@ -75,7 +96,7 @@ export function UnifiedTransactionList({ transactions, onSelect }: UnifiedTransa
   }
 
   return (
-    <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+    <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-700 dark:bg-slate-900">
       {transactions.map((tx) => (
         <TransactionItem key={tx.id} tx={tx} onSelect={onSelect} />
       ))}

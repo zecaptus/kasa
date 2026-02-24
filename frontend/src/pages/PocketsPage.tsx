@@ -2,6 +2,8 @@ import { useCallback, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { PocketCard } from '../components/PocketCard';
 import { PocketForm } from '../components/PocketForm';
+import { Button } from '../components/ui/Button';
+import { inputCls } from '../lib/inputCls';
 import type { PocketSummaryDto } from '../services/pocketsApi';
 import {
   useCreateMovementMutation,
@@ -78,10 +80,10 @@ function MovementForm({ pocket, onClose }: MovementFormProps) {
             key={d}
             type="button"
             onClick={() => setDirection(d)}
-            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+            className={`flex-1 rounded-xl py-2 text-sm font-semibold transition-colors ${
               direction === d
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                ? 'bg-kasa-accent text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
             }`}
           >
             {intl.formatMessage({
@@ -94,7 +96,10 @@ function MovementForm({ pocket, onClose }: MovementFormProps) {
 
       {/* Amount */}
       <div className="flex flex-col gap-1">
-        <label htmlFor="movement-amount" className="text-sm font-medium text-slate-700">
+        <label
+          htmlFor="movement-amount"
+          className="text-sm font-medium text-slate-600 dark:text-slate-400"
+        >
           {intl.formatMessage({ id: 'pockets.movement.amount' })} (€)
         </label>
         <input
@@ -104,13 +109,16 @@ function MovementForm({ pocket, onClose }: MovementFormProps) {
           step="0.01"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={inputCls()}
         />
       </div>
 
       {/* Date */}
       <div className="flex flex-col gap-1">
-        <label htmlFor="movement-date" className="text-sm font-medium text-slate-700">
+        <label
+          htmlFor="movement-date"
+          className="text-sm font-medium text-slate-600 dark:text-slate-400"
+        >
           {intl.formatMessage({ id: 'pockets.movement.date' })}
         </label>
         <input
@@ -118,13 +126,16 @@ function MovementForm({ pocket, onClose }: MovementFormProps) {
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={inputCls()}
         />
       </div>
 
       {/* Note */}
       <div className="flex flex-col gap-1">
-        <label htmlFor="movement-note" className="text-sm font-medium text-slate-700">
+        <label
+          htmlFor="movement-note"
+          className="text-sm font-medium text-slate-600 dark:text-slate-400"
+        >
           {intl.formatMessage({ id: 'pockets.movement.note' })}
         </label>
         <input
@@ -132,7 +143,7 @@ function MovementForm({ pocket, onClose }: MovementFormProps) {
           type="text"
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={inputCls()}
         />
       </div>
 
@@ -141,20 +152,12 @@ function MovementForm({ pocket, onClose }: MovementFormProps) {
 
       {/* Actions */}
       <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100"
-        >
+        <Button variant="ghost" type="button" onClick={onClose}>
           {intl.formatMessage({ id: 'reconciliation.action.undo' })}
-        </button>
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-        >
+        </Button>
+        <Button type="submit" disabled={isLoading}>
           {intl.formatMessage({ id: 'pockets.form.submit.create' })}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -215,11 +218,11 @@ function PocketDetailView({ pocketId, onClose }: PocketDetailViewProps) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-slate-800">{data.name}</h3>
+        <h3 className="font-semibold text-slate-800 dark:text-slate-100">{data.name}</h3>
         <button
           type="button"
           onClick={onClose}
-          className="text-sm text-slate-400 hover:text-slate-600"
+          className="text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
         >
           ✕
         </button>
@@ -246,7 +249,7 @@ function PocketDetailView({ pocketId, onClose }: PocketDetailViewProps) {
         <button
           type="button"
           onClick={() => setCursor(data.nextCursor ?? undefined)}
-          className="text-sm text-blue-600 hover:underline"
+          className="text-sm font-medium text-kasa-accent hover:underline"
         >
           {intl.formatMessage({ id: 'import.sessions.title' })}…
         </button>
@@ -273,7 +276,7 @@ function PocketListItem({ pocket, onMovement, onEdit, onDelete, onHistory }: Poc
       <button
         type="button"
         onClick={() => onHistory(pocket.id)}
-        className="mt-1 text-xs text-slate-400 hover:text-blue-600"
+        className="mt-1 text-xs text-slate-400 hover:text-kasa-accent dark:hover:text-kasa-accent"
       >
         {intl.formatMessage({ id: 'transactions.title' })} →
       </button>
@@ -312,22 +315,16 @@ export function PocketsPage() {
   return (
     <main className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-slate-800">
-          {intl.formatMessage({ id: 'pockets.title' })}
-        </h1>
-        <button
-          type="button"
-          onClick={() => setModal({ type: 'create' })}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
+        <h1 className="page-title">{intl.formatMessage({ id: 'pockets.title' })}</h1>
+        <Button onClick={() => setModal({ type: 'create' })}>
           {intl.formatMessage({ id: 'pockets.create' })}
-        </button>
+        </Button>
       </div>
 
       {/* Modal */}
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
             {(modal.type === 'create' || modal.type === 'edit') && (
               <PocketForm
                 initialValues={modal.type === 'edit' ? modal.pocket : undefined}
@@ -349,7 +346,7 @@ export function PocketsPage() {
       {isLoading && (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-200" />
+            <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-700" />
           ))}
         </div>
       )}

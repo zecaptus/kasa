@@ -26,7 +26,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
   }
 
   return (
-    <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+    <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-700 dark:bg-slate-900">
       {transactions.map((tx) => {
         const amount = tx.debit !== null ? -tx.debit : (tx.credit ?? 0);
         const isDebit = tx.debit !== null;
@@ -34,8 +34,12 @@ export function TransactionList({ transactions }: TransactionListProps) {
         return (
           <li key={tx.id} className="flex items-center gap-3 px-4 py-3">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-slate-900">{tx.label}</p>
-              {tx.detail && <p className="truncate text-xs text-slate-500">{tx.detail}</p>}
+              <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
+                {tx.label}
+              </p>
+              {tx.detail && (
+                <p className="truncate text-xs text-slate-500 dark:text-slate-400">{tx.detail}</p>
+              )}
               <p className="text-xs text-slate-400">
                 {intl.formatDate(tx.accountingDate, {
                   day: '2-digit',
@@ -47,7 +51,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
 
             <p
               className={cn('shrink-0 text-sm font-semibold tabular-nums', {
-                'text-slate-800': isDebit,
+                'text-slate-800 dark:text-slate-200': isDebit,
                 'text-green-600': !isDebit,
               })}
             >

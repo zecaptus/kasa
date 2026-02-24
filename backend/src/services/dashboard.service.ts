@@ -8,12 +8,19 @@ export interface RecentTransactionDto {
   label: string;
   amount: number;
   direction: 'debit' | 'credit';
+  transferPeerAccountLabel: string | null;
 }
 
 export interface AccountSummaryDto {
+  accountId: string;
   label: string;
+  accountNumber: string;
+  isHidden: boolean;
   balance: number;
   monthlyVariation: number;
+  currentBalance: number | null;
+  balanceDate: string | null;
+  endOfMonthPrediction: number | null;
   recentTransactions: RecentTransactionDto[];
 }
 
@@ -56,9 +63,15 @@ interface MonthlyExpenseRow {
 }
 
 interface AccountBalanceRow {
+  account_id: string;
   account_label: string;
+  account_number: string;
+  is_hidden: boolean;
   balance: Prisma.Decimal | null;
   monthly_variation: Prisma.Decimal | null;
+  last_known_balance: Prisma.Decimal | null;
+  last_known_balance_date: Date | null;
+  balance_delta: Prisma.Decimal | null;
 }
 
 interface RecentTxRow {
@@ -67,7 +80,13 @@ interface RecentTxRow {
   label: string;
   amount: Prisma.Decimal;
   direction: string;
-  account_label: string;
+  account_id: string;
+  transfer_peer_account_label: string | null;
+}
+
+interface PredictionRow {
+  account_id: string;
+  predicted_debit: Prisma.Decimal | null;
 }
 
 interface CategorySpendingRow {
@@ -197,64 +216,132 @@ export async function getGlobalSummary(userId: string): Promise<DashboardSummary
   return { totalBalance, monthlySpending, monthlyIncome, netCashFlow };
 }
 
+// ─── getAccountPredictions ────────────────────────────────────────────────────
+
+async function getAccountPredictions(userId: string): Promise<Map<string, number>> {
+  const now = new Date();
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const endOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+
+  const rows = await prisma.$queryRaw<PredictionRow[]>(Prisma.sql`
+    SELECT last_tx.account_id, SUM(rp."amount") AS predicted_debit
+    FROM "RecurringPattern" rp
+    JOIN LATERAL (
+      SELECT it."accountId" AS account_id
+      FROM "ImportedTransaction" it
+      WHERE it."recurringPatternId" = rp.id
+      ORDER BY it."accountingDate" DESC
+      LIMIT 1
+    ) last_tx ON TRUE
+    WHERE rp."userId" = ${userId}
+      AND rp."isActive" = true
+      AND rp."nextOccurrenceDate" >= ${today}::date
+      AND rp."nextOccurrenceDate" <= ${endOfMonth}::date
+      AND rp."amount" IS NOT NULL
+    GROUP BY last_tx.account_id
+  `);
+
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    map.set(row.account_id, toNum(row.predicted_debit));
+  }
+  return map;
+}
+
 // ─── getAccountSummaries ──────────────────────────────────────────────────────
 
 export async function getAccountSummaries(userId: string): Promise<AccountSummaryDto[]> {
   const { start, end } = currentMonthBounds();
 
-  const [balanceRows, recentRows] = await Promise.all([
+  const [balanceRows, recentRows, predictionMap] = await Promise.all([
     prisma.$queryRaw<AccountBalanceRow[]>(Prisma.sql`
       SELECT
-        "accountLabel"                                                   AS account_label,
-        COALESCE(SUM(COALESCE("credit", 0) - COALESCE("debit", 0)), 0)  AS balance,
+        a.id                                                             AS account_id,
+        a."label"                                                        AS account_label,
+        a."accountNumber"                                                AS account_number,
+        a."isHidden"                                                     AS is_hidden,
+        COALESCE(SUM(COALESCE(t."credit", 0) - COALESCE(t."debit", 0)), 0) AS balance,
         COALESCE(SUM(
-          CASE WHEN "accountingDate" >= ${start} AND "accountingDate" < ${end}
-               THEN COALESCE("credit", 0) - COALESCE("debit", 0) ELSE 0 END
-        ), 0)                                                            AS monthly_variation
-      FROM "ImportedTransaction"
-      WHERE "userId" = ${userId}
-      GROUP BY "accountLabel"
-      ORDER BY "accountLabel"
+          CASE WHEN t."accountingDate" >= ${start} AND t."accountingDate" < ${end}
+               THEN COALESCE(t."credit", 0) - COALESCE(t."debit", 0) ELSE 0 END
+        ), 0)                                                            AS monthly_variation,
+        a."lastKnownBalance"                                             AS last_known_balance,
+        a."lastKnownBalanceDate"                                         AS last_known_balance_date,
+        COALESCE(SUM(
+          CASE WHEN a."lastKnownBalanceDate" IS NOT NULL
+                AND t."accountingDate" > a."lastKnownBalanceDate"
+               THEN COALESCE(t."credit", 0) - COALESCE(t."debit", 0) ELSE 0 END
+        ), 0)                                                            AS balance_delta
+      FROM "Account" a
+      LEFT JOIN "ImportedTransaction" t ON t."accountId" = a.id
+      WHERE a."ownerId" = ${userId}
+         OR EXISTS (SELECT 1 FROM "AccountViewer" av WHERE av."accountId" = a.id AND av."userId" = ${userId})
+      GROUP BY a.id, a."label", a."accountNumber", a."isHidden", a."lastKnownBalance", a."lastKnownBalanceDate"
+      ORDER BY a."label"
     `),
     prisma.$queryRaw<RecentTxRow[]>(Prisma.sql`
       SELECT *
       FROM (
         SELECT
-          id,
-          "accountingDate"   AS date,
-          label,
-          COALESCE("debit", "credit", 0) AS amount,
-          CASE WHEN "debit" IS NOT NULL THEN 'debit' ELSE 'credit' END AS direction,
-          "accountLabel"     AS account_label,
-          ROW_NUMBER() OVER (PARTITION BY "accountLabel" ORDER BY "accountingDate" DESC, id ASC) AS rn
-        FROM "ImportedTransaction"
-        WHERE "userId" = ${userId}
+          t.id,
+          t."accountingDate"                                               AS date,
+          t.label,
+          COALESCE(t."debit", t."credit", 0)                              AS amount,
+          CASE WHEN t."debit" IS NOT NULL THEN 'debit' ELSE 'credit' END  AS direction,
+          t."accountId"                                                   AS account_id,
+          peer_acc."label"                                                AS transfer_peer_account_label,
+          ROW_NUMBER() OVER (PARTITION BY t."accountId" ORDER BY t."accountingDate" DESC, t.id ASC) AS rn
+        FROM "ImportedTransaction" t
+        JOIN "Account" a ON a.id = t."accountId"
+        LEFT JOIN "ImportedTransaction" peer_tx ON peer_tx.id = t."transferPeerId"
+        LEFT JOIN "Account" peer_acc ON peer_acc.id = peer_tx."accountId"
+        WHERE a."ownerId" = ${userId}
+           OR EXISTS (SELECT 1 FROM "AccountViewer" av WHERE av."accountId" = a.id AND av."userId" = ${userId})
       ) ranked
       WHERE rn <= 5
-      ORDER BY account_label, date DESC
+      ORDER BY account_id, date DESC
     `),
+    getAccountPredictions(userId),
   ]);
 
-  // Group recent rows by accountLabel
-  const recentByLabel = new Map<string, RecentTransactionDto[]>();
+  // Group recent rows by accountId
+  const recentById = new Map<string, RecentTransactionDto[]>();
   for (const r of recentRows) {
-    const list = recentByLabel.get(r.account_label) ?? [];
+    const list = recentById.get(r.account_id) ?? [];
     list.push({
       id: r.id,
       date: r.date.toISOString().split('T')[0] as string,
       label: r.label,
       amount: toNum(r.amount),
       direction: r.direction as 'debit' | 'credit',
+      transferPeerAccountLabel: r.transfer_peer_account_label,
     });
-    recentByLabel.set(r.account_label, list);
+    recentById.set(r.account_id, list);
   }
 
-  return balanceRows.map((row) => ({
-    label: row.account_label,
-    balance: toNum(row.balance),
-    monthlyVariation: toNum(row.monthly_variation),
-    recentTransactions: recentByLabel.get(row.account_label) ?? [],
-  }));
+  return balanceRows.map((row) => {
+    const currentBalance =
+      row.last_known_balance != null
+        ? toNum(row.last_known_balance) + toNum(row.balance_delta)
+        : null;
+    const balanceDate = row.last_known_balance_date
+      ? row.last_known_balance_date.toISOString().split('T')[0]
+      : null;
+    const upcomingDebit = predictionMap.get(row.account_id) ?? 0;
+    const endOfMonthPrediction = currentBalance !== null ? currentBalance - upcomingDebit : null;
+    return {
+      accountId: row.account_id,
+      label: row.account_label,
+      accountNumber: row.account_number,
+      isHidden: row.is_hidden,
+      balance: toNum(row.balance),
+      monthlyVariation: toNum(row.monthly_variation),
+      currentBalance,
+      balanceDate: balanceDate as string | null,
+      endOfMonthPrediction,
+      recentTransactions: recentById.get(row.account_id) ?? [],
+    };
+  });
 }
 
 // ─── getCategoryComparison ────────────────────────────────────────────────────
@@ -308,5 +395,13 @@ export async function getDashboard(userId: string): Promise<DashboardResponseDto
     getAccountSummaries(userId),
     getCategoryComparison(userId),
   ]);
-  return { summary, accounts, categoryComparison };
+
+  // totalBalance = sum of currentBalance for visible accounts (real balances override the tx sum)
+  const visibleWithBalance = accounts.filter((a) => !a.isHidden && a.currentBalance !== null);
+  const totalBalance =
+    visibleWithBalance.length > 0
+      ? visibleWithBalance.reduce((s, a) => s + (a.currentBalance ?? 0), 0)
+      : summary.totalBalance;
+
+  return { summary: { ...summary, totalBalance }, accounts, categoryComparison };
 }

@@ -12,7 +12,9 @@ import {
   useGetTransactionQuery,
   useListCategoriesQuery,
   useListCategoryRulesQuery,
+  useListRuleSuggestionsQuery,
   useListTransactionsQuery,
+  useRecategorizeAllMutation,
   useUpdateCategoryMutation,
   useUpdateCategoryRuleMutation,
   useUpdateTransactionCategoryMutation,
@@ -96,6 +98,18 @@ describe('transactionsApi hooks', () => {
     const { result } = renderHook(() => useDeleteCategoryRuleMutation(), { wrapper });
     expect(result.current).toBeDefined();
     expect(Array.isArray(result.current)).toBe(true);
+  });
+
+  it('useRecategorizeAllMutation returns mutation hook', () => {
+    const { result } = renderHook(() => useRecategorizeAllMutation(), { wrapper });
+    expect(result.current).toBeDefined();
+    expect(Array.isArray(result.current)).toBe(true);
+  });
+
+  it('useListRuleSuggestionsQuery returns query hook', () => {
+    const { result } = renderHook(() => useListRuleSuggestionsQuery(), { wrapper });
+    expect(result.current).toBeDefined();
+    expect(result.current).toHaveProperty('isLoading');
   });
 
   it('query hooks have correct structure', async () => {
@@ -196,6 +210,18 @@ describe('mutation query functions (coverage)', () => {
     await act(async () => {
       try {
         await mutate('rule1');
+      } catch {}
+    });
+  });
+
+  it('recategorizeAll mutation query function is invokable', async () => {
+    const { result } = renderHook(() => useRecategorizeAllMutation(), {
+      wrapper: isolatedWrapper,
+    });
+    const [mutate] = result.current;
+    await act(async () => {
+      try {
+        await mutate();
       } catch {}
     });
   });

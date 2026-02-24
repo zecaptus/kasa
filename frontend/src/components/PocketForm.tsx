@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { cn } from '../lib/cn';
+import { inputCls } from '../lib/inputCls';
 import { useGetDashboardQuery } from '../services/dashboardApi';
 import type { PocketSummaryDto } from '../services/pocketsApi';
 import { useCreatePocketMutation, useUpdatePocketMutation } from '../services/pocketsApi';
+import { Button } from './ui/Button';
 
 const PALETTE = ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#94a3b8'];
 
@@ -127,7 +129,10 @@ export function PocketForm({ initialValues, onSuccess, onCancel }: Props) {
       {/* Account selector — only for creation */}
       {!isEdit && (
         <div className="flex flex-col gap-1">
-          <label htmlFor="pocket-account" className="text-sm font-medium text-slate-700">
+          <label
+            htmlFor="pocket-account"
+            className="text-sm font-medium text-slate-600 dark:text-slate-400"
+          >
             {intl.formatMessage({ id: 'pockets.account' })}
           </label>
           {accounts.length === 0 ? (
@@ -139,7 +144,7 @@ export function PocketForm({ initialValues, onSuccess, onCancel }: Props) {
               id="pocket-account"
               value={accountLabel}
               onChange={(e) => setAccountLabel(e.target.value)}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={inputCls()}
             >
               {accounts.map((a) => (
                 <option key={a.label} value={a.label}>
@@ -148,13 +153,18 @@ export function PocketForm({ initialValues, onSuccess, onCancel }: Props) {
               ))}
             </select>
           )}
-          {errors.accountLabel && <p className="text-xs text-red-500">{errors.accountLabel}</p>}
+          {errors.accountLabel && (
+            <p className="text-xs text-red-600 dark:text-red-400">{errors.accountLabel}</p>
+          )}
         </div>
       )}
 
       {/* Name */}
       <div className="flex flex-col gap-1">
-        <label htmlFor="pocket-name" className="text-sm font-medium text-slate-700">
+        <label
+          htmlFor="pocket-name"
+          className="text-sm font-medium text-slate-600 dark:text-slate-400"
+        >
           {intl.formatMessage({ id: 'pockets.name' })}
         </label>
         <input
@@ -163,14 +173,17 @@ export function PocketForm({ initialValues, onSuccess, onCancel }: Props) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           maxLength={100}
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={inputCls(!!errors.name)}
         />
-        {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
+        {errors.name && <p className="text-xs text-red-600 dark:text-red-400">{errors.name}</p>}
       </div>
 
       {/* Goal amount */}
       <div className="flex flex-col gap-1">
-        <label htmlFor="pocket-goal" className="text-sm font-medium text-slate-700">
+        <label
+          htmlFor="pocket-goal"
+          className="text-sm font-medium text-slate-600 dark:text-slate-400"
+        >
           {intl.formatMessage({ id: 'pockets.goal' })} (€)
         </label>
         <input
@@ -180,14 +193,16 @@ export function PocketForm({ initialValues, onSuccess, onCancel }: Props) {
           step="0.01"
           value={goalAmount}
           onChange={(e) => setGoalAmount(e.target.value)}
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={inputCls(!!errors.goalAmount)}
         />
-        {errors.goalAmount && <p className="text-xs text-red-500">{errors.goalAmount}</p>}
+        {errors.goalAmount && (
+          <p className="text-xs text-red-600 dark:text-red-400">{errors.goalAmount}</p>
+        )}
       </div>
 
       {/* Colour palette */}
       <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium text-slate-700">
+        <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
           {intl.formatMessage({ id: 'pockets.color' })}
         </span>
         <div className="flex gap-2">
@@ -209,22 +224,14 @@ export function PocketForm({ initialValues, onSuccess, onCancel }: Props) {
 
       {/* Actions */}
       <div className="flex justify-end gap-2 pt-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100"
-        >
+        <Button variant="ghost" type="button" onClick={onCancel}>
           {intl.formatMessage({ id: 'reconciliation.action.undo' })}
-        </button>
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-        >
+        </Button>
+        <Button type="submit" disabled={isLoading}>
           {isEdit
             ? intl.formatMessage({ id: 'pockets.form.submit.update' })
             : intl.formatMessage({ id: 'pockets.form.submit.create' })}
-        </button>
+        </Button>
       </div>
     </form>
   );
