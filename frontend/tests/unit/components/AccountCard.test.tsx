@@ -1,15 +1,19 @@
 import { render, screen } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
+import { Provider } from 'react-redux';
 import { describe, expect, it } from 'vitest';
 import { AccountCard } from '../../../src/components/AccountCard';
 import enMessages from '../../../src/i18n/en.json';
 import type { AccountSummaryDto } from '../../../src/services/dashboardApi';
+import { store } from '../../../src/store';
 
 function renderCard(account: AccountSummaryDto) {
   return render(
-    <IntlProvider messages={enMessages} locale="en" defaultLocale="en">
-      <AccountCard account={account} />
-    </IntlProvider>,
+    <Provider store={store}>
+      <IntlProvider messages={enMessages} locale="en" defaultLocale="en">
+        <AccountCard account={account} />
+      </IntlProvider>
+    </Provider>,
   );
 }
 
