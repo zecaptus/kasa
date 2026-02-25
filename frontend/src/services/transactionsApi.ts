@@ -3,7 +3,7 @@ import { baseQueryWithReauth } from './baseQueryWithReauth';
 
 // ─── DTOs ─────────────────────────────────────────────────────────────────────
 
-export type CategorySource = 'NONE' | 'AUTO' | 'MANUAL';
+export type CategorySource = 'NONE' | 'AUTO' | 'AI' | 'MANUAL';
 export type TransactionType = 'IMPORTED_TRANSACTION' | 'MANUAL_EXPENSE';
 
 export interface CategoryDto {
@@ -203,6 +203,18 @@ export const transactionsApi = createApi({
       query: () => '/categories/suggestions',
       providesTags: ['CategoryRule'],
     }),
+
+    getAiStatus: builder.query<{ enabled: boolean }, void>({
+      query: () => '/categories/ai-status',
+    }),
+
+    aiCategorize: builder.mutation<
+      { categorized: number; rulesCreated: number; error?: string },
+      void
+    >({
+      query: () => ({ url: '/categories/ai-categorize', method: 'POST' }),
+      invalidatesTags: ['Transaction', 'CategoryRule'],
+    }),
   }),
 });
 
@@ -221,4 +233,6 @@ export const {
   useDeleteCategoryRuleMutation,
   useRecategorizeAllMutation,
   useListRuleSuggestionsQuery,
+  useGetAiStatusQuery,
+  useAiCategorizeMutation,
 } = transactionsApi;

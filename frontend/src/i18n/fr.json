@@ -218,5 +218,8 @@
   "recurring.edit.active": "Actif",
   "recurring.edit.save": "Enregistrer",
   "recurring.edit.cancel": "Annuler",
-  "transactions.transfer.badge": "Virement interne"
+  "transactions.transfer.badge": "Virement interne",
+  "categories.ai.badge": "Catégorisé par IA",
+  "categories.ai.button": "Catégoriser avec l'IA",
+  "categories.ai.success": "{count, plural, one {# transaction catégorisée} other {# transactions catégorisées}} par l'IA"
 }

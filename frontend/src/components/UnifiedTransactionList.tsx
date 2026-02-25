@@ -1,6 +1,7 @@
+import { Sparkles } from 'lucide-react';
 import { useIntl } from 'react-intl';
 import { cn } from '../lib/cn';
-import type { UnifiedTransactionDto } from '../services/transactionsApi';
+import type { CategorySource, UnifiedTransactionDto } from '../services/transactionsApi';
 
 interface UnifiedTransactionListProps {
   transactions: UnifiedTransactionDto[];
@@ -12,6 +13,54 @@ interface TransactionItemProps {
   onSelect: ((tx: UnifiedTransactionDto) => void) | undefined;
 }
 
+// ─── Badge helpers ───────────────────────────────────────────────────────────
+
+function AiBadge({ categorySource }: { categorySource: CategorySource }) {
+  const intl = useIntl();
+  if (categorySource !== 'AI') return null;
+  return (
+    <span
+      title={intl.formatMessage({ id: 'categories.ai.badge' })}
+      className="inline-flex items-center"
+    >
+      <Sparkles className="size-3.5 text-violet-500" />
+    </span>
+  );
+}
+
+function TransactionBadges({ tx }: { tx: UnifiedTransactionDto }) {
+  const intl = useIntl();
+  const sourceId =
+    tx.type === 'IMPORTED_TRANSACTION'
+      ? 'transactions.source.imported'
+      : 'transactions.source.manual';
+
+  return (
+    <div className="flex items-center gap-1">
+      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+        {intl.formatMessage({ id: sourceId })}
+      </span>
+      {tx.recurringPatternId !== null && (
+        <span
+          className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+          title={intl.formatMessage({ id: 'recurring.badge' })}
+        >
+          {intl.formatMessage({ id: 'recurring.badge' })}
+        </span>
+      )}
+      {tx.transferPeerAccountLabel !== null && (
+        <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
+          {tx.direction === 'debit'
+            ? `→ ${tx.transferPeerAccountLabel}`
+            : `← ${tx.transferPeerAccountLabel}`}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ─── TransactionItem ─────────────────────────────────────────────────────────
+
 function TransactionItem({ tx, onSelect }: TransactionItemProps) {
   const intl = useIntl();
   const isDebit = tx.direction === 'debit';
@@ -19,10 +68,6 @@ function TransactionItem({ tx, onSelect }: TransactionItemProps) {
     style: 'currency',
     currency: 'EUR',
   });
-  const sourceId =
-    tx.type === 'IMPORTED_TRANSACTION'
-      ? 'transactions.source.imported'
-      : 'transactions.source.manual';
 
   return (
     <li
@@ -64,27 +109,9 @@ function TransactionItem({ tx, onSelect }: TransactionItemProps) {
             style={{ backgroundColor: tx.category?.color ?? '#94a3b8' }}
           />
           {tx.category?.name ?? intl.formatMessage({ id: 'transactions.category.none' })}
+          <AiBadge categorySource={tx.categorySource} />
         </span>
-        <div className="flex items-center gap-1">
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-            {intl.formatMessage({ id: sourceId })}
-          </span>
-          {tx.recurringPatternId !== null && (
-            <span
-              className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-              title={intl.formatMessage({ id: 'recurring.badge' })}
-            >
-              {intl.formatMessage({ id: 'recurring.badge' })}
-            </span>
-          )}
-          {tx.transferPeerAccountLabel !== null && (
-            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
-              {tx.direction === 'debit'
-                ? `→ ${tx.transferPeerAccountLabel}`
-                : `← ${tx.transferPeerAccountLabel}`}
-            </span>
-          )}
-        </div>
+        <TransactionBadges tx={tx} />
       </div>
     </li>
   );

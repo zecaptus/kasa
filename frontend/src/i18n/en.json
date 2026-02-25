@@ -218,5 +218,8 @@
   "recurring.edit.active": "Active",
   "recurring.edit.save": "Save",
   "recurring.edit.cancel": "Cancel",
-  "transactions.transfer.badge": "Internal transfer"
+  "transactions.transfer.badge": "Internal transfer",
+  "categories.ai.badge": "Categorized by AI",
+  "categories.ai.button": "Categorize with AI",
+  "categories.ai.success": "{count, plural, one {# transaction categorized} other {# transactions categorized}} by AI"
 }
