@@ -17,6 +17,9 @@ importers:
 
   backend:
     dependencies:
+      '@google/generative-ai':
+        specifier: ^0.24.1
+        version: 0.24.1
       '@kasa/db':
         specifier: workspace:*
         version: link:../packages/db
@@ -642,6 +645,10 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
+
+  '@google/generative-ai@0.24.1':
+    resolution: {integrity: sha512-MqO+MLfM6kjxcKoy0p1wRzG3b4ZZXtPI+z2IE26UogS2Cm/XHO+7gGRBh6gcJsOiIVoH93UwKvW4HdgiOZCy9Q==}
+    engines: {node: '>=18.0.0'}
 
   '@hapi/bourne@3.0.0':
     resolution: {integrity: sha512-Waj1cwPXJDucOib4a3bAISsKJVb15MKi9IvmTI/7ssVEm6sywXGjVJDhl6/umt1pK1ZS7PacXU3A1PmFKHEZ2w==}
@@ -2917,6 +2924,8 @@ snapshots:
       tslib: 2.8.1
     optionalDependencies:
       typescript: 5.9.3
+
+  '@google/generative-ai@0.24.1': {}
 
   '@hapi/bourne@3.0.0': {}
 

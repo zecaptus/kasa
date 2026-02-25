@@ -101,7 +101,7 @@ export async function bulkCategorizeTransactions(
   let count = 0;
 
   for (const tx of transactions) {
-    if (tx.categorySource === 'MANUAL') continue;
+    if (tx.categorySource === 'MANUAL' || tx.categorySource === 'AI') continue;
 
     const result = matchRules(tx.label, rules);
     if (result) {
