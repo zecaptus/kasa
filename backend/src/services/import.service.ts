@@ -13,6 +13,7 @@ import { parseSgCsv } from './csvParser.service.js';
 import { runReconciliation } from './reconciliation.service.js';
 import { detectRecurringPatterns } from './recurringPatterns.service.js';
 import { detectTransferPairs } from './transferDetection.service.js';
+import { applyTransferLabelRules } from './transferLabels.service.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -196,6 +197,12 @@ export async function importCsv(
       label: t.label,
       categorySource: t.categorySource,
     })),
+  );
+
+  // Apply transfer label rules to new transactions
+  await applyTransferLabelRules(
+    userId,
+    session.transactions.map((t) => t.id),
   );
 
   // AI-categorize remaining NONE transactions (if enabled)

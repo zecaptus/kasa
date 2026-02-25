@@ -4,9 +4,12 @@ import {
   decodeCursor,
   getTransactionById,
   listTimeline,
+  listTransferCandidates,
   updateTransactionCategory,
   updateTransactionRecurring,
+  updateTransferPeer,
 } from '../services/timeline.service.js';
+import { setTransferLabel } from '../services/transferLabels.service.js';
 
 const router = new Router({ prefix: '/api/transactions' });
 
@@ -28,15 +31,15 @@ function parseListParams(q: Router.RouterContext['query']) {
     direction,
     search: str(q.search)?.trim() || undefined,
     accountId: str(q.accountId),
+    transferLabel: str(q.transferLabel),
   };
 }
 
 // GET /api/transactions
 router.get('/', async (ctx: Router.RouterContext) => {
   const userId = ctx.state.user.sub as string;
-  const { limit, rawCursor, from, to, categoryId, direction, search, accountId } = parseListParams(
-    ctx.query,
-  );
+  const { limit, rawCursor, from, to, categoryId, direction, search, accountId, transferLabel } =
+    parseListParams(ctx.query);
 
   const cursor = rawCursor ? decodeCursor(rawCursor) : undefined;
 
@@ -49,6 +52,7 @@ router.get('/', async (ctx: Router.RouterContext) => {
     direction,
     search,
     accountId,
+    transferLabel,
   });
 
   ctx.body = {
@@ -139,6 +143,86 @@ router.patch('/:id/recurring', async (ctx: Router.RouterContext) => {
   }
 
   const updated = await updateTransactionRecurring(userId, id, recurringPatternId);
+  if (!updated) {
+    ctx.status = 404;
+    ctx.body = { error: 'NOT_FOUND' };
+    return;
+  }
+
+  ctx.body = {
+    ...updated,
+    date: updated.date.toISOString().split('T')[0],
+    amount: Number(updated.amount),
+  };
+});
+
+// GET /api/transactions/:id/transfer-candidates?accountId=xxx
+router.get('/:id/transfer-candidates', async (ctx: Router.RouterContext) => {
+  const userId = ctx.state.user.sub as string;
+  const { id } = ctx.params as { id: string };
+  const accountId = typeof ctx.query.accountId === 'string' ? ctx.query.accountId : undefined;
+  if (!accountId) {
+    ctx.body = { candidates: [] };
+    return;
+  }
+  const candidates = await listTransferCandidates(userId, id, accountId);
+  ctx.body = { candidates };
+});
+
+// PATCH /api/transactions/:id/transfer-peer
+router.patch('/:id/transfer-peer', async (ctx: Router.RouterContext) => {
+  const userId = ctx.state.user.sub as string;
+  const { id } = ctx.params as { id: string };
+  const body = ctx.request.body as { transferPeerId?: unknown };
+  const transferPeerId =
+    body?.transferPeerId === null
+      ? null
+      : typeof body?.transferPeerId === 'string'
+        ? body.transferPeerId
+        : undefined;
+
+  if (transferPeerId === undefined) {
+    ctx.status = 400;
+    ctx.body = { error: 'VALIDATION_ERROR', message: 'transferPeerId must be a string or null' };
+    return;
+  }
+
+  const updated = await updateTransferPeer(userId, id, transferPeerId);
+  if (!updated) {
+    ctx.status = 404;
+    ctx.body = { error: 'NOT_FOUND' };
+    return;
+  }
+
+  ctx.body = {
+    ...updated,
+    date: updated.date.toISOString().split('T')[0],
+    amount: Number(updated.amount),
+  };
+});
+
+// PATCH /api/transactions/:id/transfer-label
+router.patch('/:id/transfer-label', async (ctx: Router.RouterContext) => {
+  const userId = ctx.state.user.sub as string;
+  const { id } = ctx.params as { id: string };
+  const body = ctx.request.body as { label?: unknown };
+  const label =
+    body?.label === null ? null : typeof body?.label === 'string' ? body.label : undefined;
+
+  if (label === undefined) {
+    ctx.status = 400;
+    ctx.body = { error: 'VALIDATION_ERROR', message: 'label must be a string or null' };
+    return;
+  }
+
+  const found = await setTransferLabel(userId, id, label);
+  if (!found) {
+    ctx.status = 404;
+    ctx.body = { error: 'NOT_FOUND' };
+    return;
+  }
+
+  const updated = await getTransactionById(userId, id);
   if (!updated) {
     ctx.status = 404;
     ctx.body = { error: 'NOT_FOUND' };

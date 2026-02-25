@@ -1,12 +1,17 @@
 import { useIntl } from 'react-intl';
 import { cn } from '../lib/cn';
-import { useListRecurringPatternsQuery } from '../services/recurringPatternsApi';
+import {
+  type RecurringPatternDto,
+  useListRecurringPatternsQuery,
+} from '../services/recurringPatternsApi';
 import {
   type UnifiedTransactionDto,
   useUpdateTransactionCategoryMutation,
 } from '../services/transactionsApi';
 import { CategoryPicker } from './CategoryPicker';
 import { RecurringPatternPicker } from './RecurringPatternPicker';
+import { TransferLabelEditor } from './TransferLabelEditor';
+import { TransferPeerPicker } from './TransferPeerPicker';
 
 interface TransactionDetailProps {
   transaction: UnifiedTransactionDto | null;
@@ -33,22 +38,29 @@ function CategorySourceNote({ source }: { source: string }) {
   return <p className="text-xs text-slate-400">{intl.formatMessage({ id: key })}</p>;
 }
 
-function TransferInfoRow({ transaction }: { transaction: UnifiedTransactionDto }) {
+function ImportedTransactionFields({
+  transaction,
+  patterns,
+}: {
+  transaction: UnifiedTransactionDto;
+  patterns: RecurringPatternDto[];
+}) {
   const intl = useIntl();
-  if (transaction.transferPeerAccountLabel === null) return null;
-  const label =
-    transaction.direction === 'debit'
-      ? `→ ${transaction.transferPeerAccountLabel}`
-      : `← ${transaction.transferPeerAccountLabel}`;
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-sm text-slate-500">
-        {intl.formatMessage({ id: 'transactions.transfer.badge' })}
-      </span>
-      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
-        {label}
-      </span>
-    </div>
+    <>
+      <TransferPeerPicker transaction={transaction} />
+      {transaction.transferPeerId === null && <TransferLabelEditor transaction={transaction} />}
+      <div className="space-y-2">
+        <span className="text-sm text-slate-500">
+          {intl.formatMessage({ id: 'recurring.link.title' })}
+        </span>
+        <RecurringPatternPicker
+          transactionId={transaction.id}
+          currentPatternId={transaction.recurringPatternId}
+          patterns={patterns}
+        />
+      </div>
+    </>
   );
 }
 
@@ -168,19 +180,11 @@ export function TransactionDetail({ transaction, onClose }: TransactionDetailPro
             <CategorySourceNote source={transaction.categorySource} />
           </div>
 
-          <TransferInfoRow transaction={transaction} />
-
           {transaction.type === 'IMPORTED_TRANSACTION' && (
-            <div className="space-y-2">
-              <span className="text-sm text-slate-500">
-                {intl.formatMessage({ id: 'recurring.link.title' })}
-              </span>
-              <RecurringPatternPicker
-                transactionId={transaction.id}
-                currentPatternId={transaction.recurringPatternId}
-                patterns={recurringData?.patterns ?? []}
-              />
-            </div>
+            <ImportedTransactionFields
+              transaction={transaction}
+              patterns={recurringData?.patterns ?? []}
+            />
           )}
         </div>
       </div>

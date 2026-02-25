@@ -28,6 +28,9 @@ export interface UnifiedTransaction {
   recurringPatternId: string | null;
   transferPeerId: string | null;
   transferPeerAccountLabel: string | null;
+  transferLabel: string | null;
+  accountId: string | null;
+  accountLabel: string | null;
 }
 
 export interface TimelineCursor {
@@ -44,6 +47,7 @@ export interface ListTimelineOptions {
   direction: 'debit' | 'credit' | undefined;
   search: string | undefined;
   accountId: string | undefined;
+  transferLabel: string | undefined;
 }
 
 export interface TimelineTotals {
@@ -71,6 +75,9 @@ interface UnifiedRow {
   recurring_pattern_id: string | null;
   transfer_peer_id: string | null;
   transfer_peer_account_label: string | null;
+  transfer_label: string | null;
+  account_id: string | null;
+  account_label: string | null;
 }
 
 interface TotalsRow {
@@ -141,6 +148,12 @@ function buildMeCategoryClause(categoryId: string | undefined): Prisma.Sql {
   return Prisma.empty;
 }
 
+function buildItTransferLabelClause(transferLabel: string | undefined): Prisma.Sql {
+  if (transferLabel === 'none') return Prisma.sql`AND it."transferLabel" IS NULL`;
+  if (transferLabel) return Prisma.sql`AND it."transferLabel" = ${transferLabel}`;
+  return Prisma.empty;
+}
+
 interface FilterClauses {
   itFromClause: Prisma.Sql;
   itToClause: Prisma.Sql;
@@ -154,6 +167,7 @@ interface FilterClauses {
   meCategoryClause: Prisma.Sql;
   itAccountClause: Prisma.Sql;
   meAccountGuard: Prisma.Sql;
+  itTransferLabelClause: Prisma.Sql;
 }
 
 function buildFilterClauses(options: ListTimelineOptions): FilterClauses {
@@ -184,6 +198,7 @@ function buildFilterClauses(options: ListTimelineOptions): FilterClauses {
       ? Prisma.sql`AND it."accountId" = ${options.accountId}`
       : Prisma.empty,
     meAccountGuard: options.accountId ? Prisma.sql`AND FALSE` : Prisma.empty,
+    itTransferLabelClause: buildItTransferLabelClause(options.transferLabel),
   };
 }
 
@@ -215,11 +230,15 @@ export async function listTimeline(
       c."isSystem"                                  AS "cat_is_system",
       it."recurringPatternId"                       AS "recurring_pattern_id",
       it."transferPeerId"                           AS "transfer_peer_id",
-      peer_acc."label"                              AS "transfer_peer_account_label"
+      peer_acc."label"                              AS "transfer_peer_account_label",
+      it."transferLabel"                            AS "transfer_label",
+      it."accountId"                                AS "account_id",
+      acc."label"                                   AS "account_label"
     FROM "ImportedTransaction" it
     LEFT JOIN "Category" c ON c."id" = it."categoryId"
     LEFT JOIN "ImportedTransaction" peer_tx ON peer_tx."id" = it."transferPeerId"
     LEFT JOIN "Account" peer_acc ON peer_acc."id" = peer_tx."accountId"
+    LEFT JOIN "Account" acc ON acc."id" = it."accountId"
     WHERE it."userId" = ${userId}
       ${itCursorClause}
       ${f.itFromClause}
@@ -228,6 +247,7 @@ export async function listTimeline(
       ${f.itSearchClause}
       ${f.itCategoryClause}
       ${f.itAccountClause}
+      ${f.itTransferLabelClause}
 
     UNION ALL
 
@@ -248,7 +268,10 @@ export async function listTimeline(
       c."isSystem"                                  AS "cat_is_system",
       NULL::text                                    AS "recurring_pattern_id",
       NULL::text                                    AS "transfer_peer_id",
-      NULL::text                                    AS "transfer_peer_account_label"
+      NULL::text                                    AS "transfer_peer_account_label",
+      NULL::text                                    AS "transfer_label",
+      NULL::text                                    AS "account_id",
+      NULL::text                                    AS "account_label"
     FROM "ManualExpense" me
     LEFT JOIN "Category" c ON c."id" = me."categoryId"
     WHERE me."userId" = ${userId}
@@ -299,6 +322,9 @@ export async function listTimeline(
     recurringPatternId: row.recurring_pattern_id,
     transferPeerId: row.transfer_peer_id,
     transferPeerAccountLabel: row.transfer_peer_account_label,
+    transferLabel: row.transfer_label ?? null,
+    accountId: row.account_id,
+    accountLabel: row.account_label,
   }));
 
   // Compute totals for the filtered set (all pages, not just current)
@@ -361,7 +387,7 @@ export async function getTransactionById(
 ): Promise<UnifiedTransaction | null> {
   const it = await prisma.importedTransaction.findFirst({
     where: { id, userId },
-    include: { category: true, transferPeer: { include: { account: true } } },
+    include: { category: true, account: true, transferPeer: { include: { account: true } } },
   });
 
   if (it) {
@@ -388,6 +414,9 @@ export async function getTransactionById(
       recurringPatternId: it.recurringPatternId,
       transferPeerId: it.transferPeerId,
       transferPeerAccountLabel: it.transferPeer?.account.label ?? null,
+      transferLabel: it.transferLabel,
+      accountId: it.accountId,
+      accountLabel: it.account.label,
     };
   }
 
@@ -420,6 +449,9 @@ export async function getTransactionById(
       recurringPatternId: null,
       transferPeerId: null,
       transferPeerAccountLabel: null,
+      transferLabel: null,
+      accountId: null,
+      accountLabel: null,
     };
   }
 
@@ -450,6 +482,177 @@ export async function updateTransactionRecurring(
     data: { recurringPatternId },
   });
   return getTransactionById(userId, id);
+}
+
+// ─── TransferCandidateResult ──────────────────────────────────────────────────
+
+export interface TransferCandidateResult {
+  id: string;
+  label: string;
+  date: string;
+  amount: number;
+  direction: 'debit' | 'credit';
+  accountLabel: string;
+  linkedToAccountLabel: string | null;
+}
+
+// ─── listTransferCandidates ───────────────────────────────────────────────────
+
+export async function listTransferCandidates(
+  userId: string,
+  txId: string,
+  accountId: string,
+): Promise<TransferCandidateResult[]> {
+  const tx = await prisma.importedTransaction.findFirst({
+    where: { id: txId, userId },
+    select: { id: true, debit: true, credit: true },
+  });
+  if (!tx) return [];
+
+  const amount = tx.debit ?? tx.credit;
+  if (!amount) return [];
+
+  const candidates = await prisma.importedTransaction.findMany({
+    where: {
+      userId,
+      accountId,
+      id: { not: txId },
+      ...(tx.debit !== null ? { credit: amount } : { debit: amount }),
+    },
+    select: {
+      id: true,
+      label: true,
+      accountingDate: true,
+      debit: true,
+      credit: true,
+      transferPeerId: true,
+      account: { select: { label: true } },
+      transferPeer: { select: { account: { select: { label: true } } } },
+    },
+    orderBy: { accountingDate: 'desc' },
+    take: 200,
+  });
+
+  return candidates.map((c) => ({
+    id: c.id,
+    label: c.label,
+    date: c.accountingDate.toISOString().split('T')[0] as string,
+    amount: Number(c.debit ?? c.credit),
+    direction: (c.debit !== null ? 'debit' : 'credit') as 'debit' | 'credit',
+    accountLabel: c.account.label,
+    linkedToAccountLabel:
+      c.transferPeerId !== null && c.transferPeerId !== txId
+        ? (c.transferPeer?.account.label ?? null)
+        : null,
+  }));
+}
+
+// ─── updateTransferPeer ───────────────────────────────────────────────────────
+
+type PrismaTransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/**
+ * Handles the old peer when reassigning a transfer:
+ * - If the new peer also had an existing link, swap: link oldPeer ↔ newPeerOldPeer.
+ * - Otherwise, simply unlink the old peer.
+ */
+async function relinkOrphans(
+  db: PrismaTransactionClient,
+  oldPeerId: string,
+  newPeerOldPeerId: string | null,
+  txId: string,
+): Promise<void> {
+  const sel = { select: { id: true } } as const;
+  if (newPeerOldPeerId && newPeerOldPeerId !== txId) {
+    await db.importedTransaction.update({
+      where: { id: oldPeerId },
+      data: { transferPeerId: newPeerOldPeerId },
+      ...sel,
+    });
+    await db.importedTransaction.update({
+      where: { id: newPeerOldPeerId },
+      data: { transferPeerId: oldPeerId },
+      ...sel,
+    });
+  } else {
+    await db.importedTransaction.update({
+      where: { id: oldPeerId },
+      data: { transferPeerId: null },
+      ...sel,
+    });
+  }
+}
+
+async function applyTransferPeerUpdate(
+  db: PrismaTransactionClient,
+  userId: string,
+  txId: string,
+  oldPeerId: string | null,
+  newPeerId: string | null,
+): Promise<void> {
+  const sel = { select: { id: true } } as const;
+  if (!newPeerId) {
+    if (oldPeerId) {
+      await db.importedTransaction.update({
+        where: { id: oldPeerId },
+        data: { transferPeerId: null },
+        ...sel,
+      });
+    }
+    await db.importedTransaction.update({
+      where: { id: txId },
+      data: { transferPeerId: null },
+      ...sel,
+    });
+    return;
+  }
+
+  const newPeer = await db.importedTransaction.findFirst({
+    where: { id: newPeerId, userId },
+    select: { transferPeerId: true },
+  });
+  if (!newPeer) throw Object.assign(new Error('PEER_NOT_FOUND'), { status: 404 });
+
+  const newPeerOldPeerId = newPeer.transferPeerId;
+
+  if (oldPeerId && oldPeerId !== newPeerId) {
+    await relinkOrphans(db, oldPeerId, newPeerOldPeerId, txId);
+  } else if (newPeerOldPeerId && newPeerOldPeerId !== txId) {
+    await db.importedTransaction.update({
+      where: { id: newPeerOldPeerId },
+      data: { transferPeerId: null },
+      ...sel,
+    });
+  }
+
+  await db.importedTransaction.update({
+    where: { id: txId },
+    data: { transferPeerId: newPeerId },
+    ...sel,
+  });
+  await db.importedTransaction.update({
+    where: { id: newPeerId },
+    data: { transferPeerId: txId },
+    ...sel,
+  });
+}
+
+export async function updateTransferPeer(
+  userId: string,
+  txId: string,
+  newPeerId: string | null,
+): Promise<UnifiedTransaction | null> {
+  const tx = await prisma.importedTransaction.findFirst({
+    where: { id: txId, userId },
+    select: { id: true, transferPeerId: true },
+  });
+  if (!tx) return null;
+
+  await prisma.$transaction((db) =>
+    applyTransferPeerUpdate(db, userId, txId, tx.transferPeerId, newPeerId),
+  );
+
+  return getTransactionById(userId, txId);
 }
 
 // ─── updateTransactionCategory ───────────────────────────────────────────────

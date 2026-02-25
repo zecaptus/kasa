@@ -26,12 +26,15 @@ function buildParams(filters: Filters, cursor: string | undefined): ListTransact
   if (filters.direction) p.direction = filters.direction;
   if (filters.search) p.search = filters.search;
   if (filters.accountId) p.accountId = filters.accountId;
+  if (filters.transferLabel) p.transferLabel = filters.transferLabel;
   if (cursor) p.cursor = cursor;
   return p;
 }
 
 function filtersKey(f: Filters): string {
-  return [f.from, f.to, f.categoryId, f.direction, f.search, f.accountId].join('|');
+  return [f.from, f.to, f.categoryId, f.direction, f.search, f.accountId, f.transferLabel].join(
+    '|',
+  );
 }
 
 // ─── AddButton ────────────────────────────────────────────────────────────────
@@ -161,7 +164,7 @@ export function TransactionsPage() {
   const showSkeleton = isLoading && extra.length === 0;
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6">
+    <div className="mx-auto max-w-2xl px-4 py-6 lg:max-w-5xl">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <h1 className="font-display text-2xl font-semibold tracking-tight text-kasa-dark dark:text-slate-100">

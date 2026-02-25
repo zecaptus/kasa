@@ -200,8 +200,7 @@ function buildCategoryComparison(
     currentMonth.push({ ...OTHER_ENTRY, amount: otherCurrentAmount });
     previousMonth.push({ ...OTHER_ENTRY, amount: otherPreviousAmount });
   }
-console.log(currentMonth
-)
+  console.log(currentMonth);
   return { currentMonth, previousMonth };
 }
 
@@ -222,6 +221,7 @@ export async function getGlobalSummary(
       FROM "ImportedTransaction" it
       JOIN "Account" a ON a.id = it."accountId" AND a."isHidden" = false
       WHERE it."userId" = ${userId}
+        AND it."transferPeerId" IS NULL
     `),
     prisma.$queryRaw<MonthlyExpenseRow[]>(Prisma.sql`
       SELECT COALESCE(SUM("amount"), 0) AS monthly_spending_manual
@@ -404,6 +404,7 @@ export async function getCategoryComparison(
           AND it."accountingDate" >= ${start}
           AND it."accountingDate" < ${end}
           AND it."debit" IS NOT NULL
+          AND it."transferPeerId" IS NULL
 
         UNION ALL
 

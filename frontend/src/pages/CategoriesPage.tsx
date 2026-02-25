@@ -3,22 +3,27 @@ import { useIntl } from 'react-intl';
 import { CategoryForm } from '../components/CategoryForm';
 import { CategoryRuleForm } from '../components/CategoryRuleForm';
 import { RuleSuggestions } from '../components/RuleSuggestions';
+import { TransferLabelRuleForm } from '../components/TransferLabelRuleForm';
 import { Button } from '../components/ui/Button';
 import { cn } from '../lib/cn';
 import {
   type CategoryDto,
   type CategoryRuleDto,
   type RuleSuggestionDto,
+  type TransferLabelRuleDto,
   useDeleteCategoryMutation,
   useDeleteCategoryRuleMutation,
+  useDeleteTransferLabelRuleMutation,
   useListCategoriesQuery,
   useListCategoryRulesQuery,
   useListRuleSuggestionsQuery,
+  useListTransferLabelRulesQuery,
   useRecategorizeAllMutation,
 } from '../services/transactionsApi';
 
 interface RuleFormSectionProps {
   showRuleForm: boolean;
+  editingRule: CategoryRuleDto | null;
   pendingSuggestion: string | undefined;
   suggestions: RuleSuggestionDto[];
   onShowForm: () => void;
@@ -28,6 +33,7 @@ interface RuleFormSectionProps {
 
 function RuleFormSection({
   showRuleForm,
+  editingRule,
   pendingSuggestion,
   suggestions,
   onShowForm,
@@ -35,16 +41,21 @@ function RuleFormSection({
   onSuccess,
 }: RuleFormSectionProps) {
   const intl = useIntl();
+  const formKey = editingRule ? editingRule.id : (pendingSuggestion ?? '');
+  const formInitialValues = editingRule
+    ? { keyword: editingRule.keyword, categoryId: editingRule.categoryId }
+    : pendingSuggestion !== undefined
+      ? { keyword: pendingSuggestion, categoryId: '' }
+      : undefined;
   return (
     <>
       <RuleSuggestions suggestions={suggestions} onAccept={onAcceptSuggestion} />
       {showRuleForm ? (
         <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
           <CategoryRuleForm
-            key={pendingSuggestion ?? ''}
-            {...(pendingSuggestion !== undefined
-              ? { initialValues: { keyword: pendingSuggestion, categoryId: '' } }
-              : {})}
+            key={formKey}
+            {...(formInitialValues !== undefined ? { initialValues: formInitialValues } : {})}
+            {...(editingRule !== null ? { ruleId: editingRule.id } : {})}
             onSuccess={onSuccess}
           />
         </div>
@@ -117,6 +128,107 @@ async function confirmAndDeleteCategory(
   await deleteFn(cat.id);
 }
 
+function TransferLabelSection() {
+  const intl = useIntl();
+  const { data: transferLabelRulesData } = useListTransferLabelRulesQuery();
+  const [deleteTransferLabelRule] = useDeleteTransferLabelRuleMutation();
+  const [showTransferLabelForm, setShowTransferLabelForm] = useState(false);
+  const [editingTransferLabelRule, setEditingTransferLabelRule] =
+    useState<TransferLabelRuleDto | null>(null);
+  const [labeledCount, setLabeledCount] = useState<number | undefined>(undefined);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  function handleSuccess(labeled?: number) {
+    setShowTransferLabelForm(false);
+    setEditingTransferLabelRule(null);
+    setLabeledCount(labeled);
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setLabeledCount(undefined), 4000);
+  }
+
+  const rules = transferLabelRulesData?.rules ?? [];
+
+  return (
+    <section className="mt-8 space-y-4">
+      <h2 className="text-lg font-semibold text-kasa-dark dark:text-slate-100">
+        {intl.formatMessage({ id: 'transfer.labels.title' })}
+      </h2>
+
+      {labeledCount !== undefined && (
+        <output className="block rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400">
+          {intl.formatMessage({ id: 'transfer.labels.labeled' }, { count: labeledCount })}
+        </output>
+      )}
+
+      {rules.length > 0 && (
+        <ul className={cn(listCls, 'mb-3')}>
+          {rules.map((rule: TransferLabelRuleDto) => (
+            <li key={rule.id} className="flex items-center gap-3 px-4 py-3">
+              <span className="min-w-0 flex-1 truncate text-sm text-slate-700 dark:text-slate-300">
+                <span className="font-mono text-xs text-slate-500">{rule.keyword}</span>
+                <span className="mx-2 text-slate-300">→</span>
+                <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
+                  {rule.label}
+                </span>
+              </span>
+              <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                {intl.formatMessage(
+                  { id: 'transfer.labels.rule.stats' },
+                  { count: rule.transactionCount ?? 0 },
+                )}
+              </span>
+              <span className="flex shrink-0 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingTransferLabelRule(rule);
+                    setShowTransferLabelForm(true);
+                  }}
+                  className="rounded-lg px-2.5 py-1 text-xs font-medium text-kasa-accent transition-colors hover:bg-kasa-accent/10 dark:hover:bg-kasa-accent/15"
+                >
+                  {intl.formatMessage({ id: 'categories.edit' })}
+                </button>
+                <Button variant="danger" size="sm" onClick={() => deleteTransferLabelRule(rule.id)}>
+                  {intl.formatMessage({ id: 'transfer.labels.rule.delete' })}
+                </Button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {showTransferLabelForm ? (
+        <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+          <TransferLabelRuleForm
+            key={editingTransferLabelRule?.id ?? ''}
+            {...(editingTransferLabelRule !== null
+              ? {
+                  initialValues: {
+                    keyword: editingTransferLabelRule.keyword,
+                    label: editingTransferLabelRule.label,
+                  },
+                  ruleId: editingTransferLabelRule.id,
+                }
+              : {})}
+            onSuccess={handleSuccess}
+          />
+        </div>
+      ) : (
+        <Button
+          onClick={() => {
+            setEditingTransferLabelRule(null);
+            setShowTransferLabelForm(true);
+          }}
+        >
+          {intl.formatMessage({ id: 'transfer.labels.rule.create' })}
+        </Button>
+      )}
+    </section>
+  );
+}
+
 export function CategoriesPage() {
   const intl = useIntl();
 
@@ -130,6 +242,7 @@ export function CategoriesPage() {
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [editingCategory, setEditingCategory] = useState<CategoryDto | null>(null);
   const [showRuleForm, setShowRuleForm] = useState(false);
+  const [editingRule, setEditingRule] = useState<CategoryRuleDto | null>(null);
   const [recategorizedCount, setRecategorizedCount] = useState<number | undefined>(undefined);
   const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -137,6 +250,7 @@ export function CategoriesPage() {
 
   function handleRuleSuccess(categorized?: number) {
     setShowRuleForm(false);
+    setEditingRule(null);
     setRecategorizedCount(categorized);
     clearTimeout(bannerTimerRef.current);
     bannerTimerRef.current = setTimeout(() => setRecategorizedCount(undefined), 4000);
@@ -326,14 +440,21 @@ export function CategoriesPage() {
                         { count: rule.transactionCount ?? 0 },
                       )}
                     </span>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      className="shrink-0"
-                      onClick={() => deleteRule(rule.id)}
-                    >
-                      {intl.formatMessage({ id: 'categories.rules.delete' })}
-                    </Button>
+                    <span className="flex shrink-0 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingRule(rule);
+                          setShowRuleForm(true);
+                        }}
+                        className="rounded-lg px-2.5 py-1 text-xs font-medium text-kasa-accent transition-colors hover:bg-kasa-accent/10 dark:hover:bg-kasa-accent/15"
+                      >
+                        {intl.formatMessage({ id: 'categories.edit' })}
+                      </button>
+                      <Button variant="danger" size="sm" onClick={() => deleteRule(rule.id)}>
+                        {intl.formatMessage({ id: 'categories.rules.delete' })}
+                      </Button>
+                    </span>
                   </li>
                 );
               })}
@@ -342,10 +463,15 @@ export function CategoriesPage() {
 
           <RuleFormSection
             showRuleForm={showRuleForm}
+            editingRule={editingRule}
             pendingSuggestion={pendingSuggestion}
             suggestions={suggestions}
-            onShowForm={() => setShowRuleForm(true)}
+            onShowForm={() => {
+              setEditingRule(null);
+              setShowRuleForm(true);
+            }}
             onAcceptSuggestion={(keyword) => {
+              setEditingRule(null);
               setPendingSuggestion(keyword);
               setShowRuleForm(true);
             }}
@@ -356,6 +482,8 @@ export function CategoriesPage() {
           />
         </div>
       </section>
+
+      <TransferLabelSection />
     </main>
   );
 }

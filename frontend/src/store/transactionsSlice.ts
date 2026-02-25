@@ -7,6 +7,7 @@ export interface TransactionFilters {
   direction: 'debit' | 'credit' | undefined;
   search: string;
   accountId: string | undefined;
+  transferLabel: string | undefined;
 }
 
 export interface TransactionsState {
@@ -21,6 +22,7 @@ const initialState: TransactionsState = {
     direction: undefined,
     search: '',
     accountId: undefined,
+    transferLabel: undefined,
   },
 };
 
