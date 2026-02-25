@@ -6,16 +6,33 @@ export interface AiProvider {
   generate(prompt: string): Promise<string>;
 }
 
-// ─── Gemini provider ────────────────────────────────────────────────────────────
+// ─── Gemini provider (multi-model fallback) ─────────────────────────────────────
+
+const GEMINI_MODELS = ['gemini-3-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'] as const;
 
 export function createGeminiProvider(apiKey: string): AiProvider {
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
   return {
     async generate(prompt: string): Promise<string> {
-      const result = await model.generateContent(prompt);
-      return result.response.text();
+      let lastError: unknown;
+
+      for (const modelName of GEMINI_MODELS) {
+        try {
+          const model = genAI.getGenerativeModel({ model: modelName });
+          const result = await model.generateContent(prompt);
+          console.log(`[aiProvider] Gemini success with model: ${modelName}`);
+          return result.response.text();
+        } catch (err) {
+          lastError = err;
+          console.warn(
+            `[aiProvider] Gemini ${modelName} failed:`,
+            err instanceof Error ? err.message : err,
+          );
+        }
+      }
+
+      throw lastError;
     },
   };
 }
@@ -74,7 +91,7 @@ async function tryPrimaryThenFallback(
   } catch (err) {
     if (!fallback) throw err;
     console.warn(
-      '[aiProvider] Gemini failed, falling back to Groq:',
+      '[aiProvider] All Gemini models failed, falling back to Groq:',
       err instanceof Error ? err.message : err,
     );
     return fallback.generate(prompt);

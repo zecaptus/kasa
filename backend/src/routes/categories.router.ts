@@ -1,8 +1,8 @@
 import { prisma } from '@kasa/db';
 import Router from '@koa/router';
+import { config } from '../config.js';
 import { requireAuth } from '../middleware/auth.js';
 import { aiCategorizeBatch } from '../services/aiCategorization.service.js';
-import { config } from '../config.js';
 import {
   createCategory,
   createCategoryRule,
@@ -122,7 +122,7 @@ router.post('/ai-categorize', async (ctx: Router.RouterContext) => {
 
   const uncategorized = await prisma.importedTransaction.findMany({
     where: { userId, categorySource: 'NONE' },
-    select: { id: true, label: true, categorySource: true },
+    select: { id: true, label: true, detail: true, categorySource: true },
   });
 
   if (uncategorized.length === 0) {
