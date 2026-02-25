@@ -17,7 +17,8 @@ export interface AccountSummaryDto {
   accountNumber: string;
   isHidden: boolean;
   balance: number;
-  monthlyVariation: number;
+  rangeVariation: number;
+  balanceAtRangeStart: number;
   currentBalance: number | null;
   balanceDate: string | null;
   endOfMonthPrediction: number | null;
@@ -50,6 +51,20 @@ export interface DashboardResponseDto {
   categoryComparison: CategoryComparisonDto;
 }
 
+// ─── Date range types ─────────────────────────────────────────────────────────
+
+export interface DateRangeParams {
+  from?: string;
+  to?: string;
+}
+
+interface ResolvedRange {
+  start: Date;
+  end: Date;
+  prevStart: Date;
+  prevEnd: Date;
+}
+
 // ─── Raw row types ─────────────────────────────────────────────────────────────
 
 interface GlobalSummaryRow {
@@ -68,7 +83,8 @@ interface AccountBalanceRow {
   account_number: string;
   is_hidden: boolean;
   balance: Prisma.Decimal | null;
-  monthly_variation: Prisma.Decimal | null;
+  range_variation: Prisma.Decimal | null;
+  net_since_range_start: Prisma.Decimal | null;
   last_known_balance: Prisma.Decimal | null;
   last_known_balance_date: Date | null;
   balance_delta: Prisma.Decimal | null;
@@ -104,24 +120,33 @@ function toNum(d: Prisma.Decimal | null | undefined): number {
   return Number(d);
 }
 
-function currentMonthBounds(): { start: Date; end: Date } {
+function resolveRange(params: DateRangeParams): ResolvedRange {
   const now = new Date();
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-  return { start, end };
-}
 
-function prevMonthBounds(): { start: Date; end: Date } {
-  const now = new Date();
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  return { start, end };
+  const fromDate = params.from
+    ? new Date(`${params.from}T00:00:00Z`)
+    : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+
+  const toDate = params.to
+    ? new Date(`${params.to}T00:00:00Z`)
+    : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+
+  const start = fromDate;
+  // end is exclusive (to + 1 day)
+  const end = new Date(toDate.getTime() + 24 * 60 * 60 * 1000);
+
+  // Previous period = same duration shifted backwards (prevEnd = start)
+  const durationMs = end.getTime() - start.getTime();
+  const prevEnd = new Date(start.getTime());
+  const prevStart = new Date(start.getTime() - durationMs);
+
+  return { start, end, prevStart, prevEnd };
 }
 
 const OTHER_ENTRY: Omit<CategorySpendingDto, 'amount'> = {
   categoryId: null,
-  name: 'other',
-  slug: 'other',
+  name: '__aggregate_other__',
+  slug: '__aggregate_other__',
   color: '#94a3b8',
 };
 
@@ -140,9 +165,9 @@ function buildCategoryComparison(
 
   const toDto = (r: CategorySpendingRow): CategorySpendingDto => ({
     categoryId: r.category_id,
-    name: r.cat_name ?? 'other',
-    slug: r.cat_slug ?? 'other',
-    color: r.cat_color ?? '#94a3b8',
+    name: r.cat_name ?? 'uncategorized',
+    slug: r.cat_slug ?? 'uncategorized',
+    color: r.cat_color ?? '#64748b',
     amount: toNum(r.amount),
   });
 
@@ -159,9 +184,9 @@ function buildCategoryComparison(
     const prev = prevMap.get(topRow.category_id);
     return {
       categoryId: topRow.category_id,
-      name: topRow.cat_name ?? 'other',
-      slug: topRow.cat_slug ?? 'other',
-      color: topRow.cat_color ?? '#94a3b8',
+      name: topRow.cat_name ?? 'uncategorized',
+      slug: topRow.cat_slug ?? 'uncategorized',
+      color: topRow.cat_color ?? '#64748b',
       amount: prev ? toNum(prev.amount) : 0,
     };
   });
@@ -175,22 +200,24 @@ function buildCategoryComparison(
     currentMonth.push({ ...OTHER_ENTRY, amount: otherCurrentAmount });
     previousMonth.push({ ...OTHER_ENTRY, amount: otherPreviousAmount });
   }
-
+console.log(currentMonth
+)
   return { currentMonth, previousMonth };
 }
 
 // ─── getGlobalSummary ─────────────────────────────────────────────────────────
 
-export async function getGlobalSummary(userId: string): Promise<DashboardSummaryDto> {
-  const { start, end } = currentMonthBounds();
-
+export async function getGlobalSummary(
+  userId: string,
+  range: ResolvedRange,
+): Promise<DashboardSummaryDto> {
   const [summaryRows, manualRows] = await Promise.all([
     prisma.$queryRaw<GlobalSummaryRow[]>(Prisma.sql`
       SELECT
         COALESCE(SUM(COALESCE(it."credit", 0) - COALESCE(it."debit", 0)), 0) AS total_balance,
-        COALESCE(SUM(CASE WHEN it."accountingDate" >= ${start} AND it."accountingDate" < ${end}
+        COALESCE(SUM(CASE WHEN it."accountingDate" >= ${range.start} AND it."accountingDate" < ${range.end}
                          THEN COALESCE(it."debit", 0) ELSE 0 END), 0)        AS monthly_spending_imported,
-        COALESCE(SUM(CASE WHEN it."accountingDate" >= ${start} AND it."accountingDate" < ${end}
+        COALESCE(SUM(CASE WHEN it."accountingDate" >= ${range.start} AND it."accountingDate" < ${range.end}
                          THEN COALESCE(it."credit", 0) ELSE 0 END), 0)       AS monthly_income
       FROM "ImportedTransaction" it
       JOIN "Account" a ON a.id = it."accountId" AND a."isHidden" = false
@@ -200,8 +227,8 @@ export async function getGlobalSummary(userId: string): Promise<DashboardSummary
       SELECT COALESCE(SUM("amount"), 0) AS monthly_spending_manual
       FROM "ManualExpense"
       WHERE "userId" = ${userId}
-        AND "date" >= ${start}
-        AND "date" < ${end}
+        AND "date" >= ${range.start}
+        AND "date" < ${range.end}
     `),
   ]);
 
@@ -219,10 +246,9 @@ export async function getGlobalSummary(userId: string): Promise<DashboardSummary
 
 // ─── getAccountPredictions ────────────────────────────────────────────────────
 
-async function getAccountPredictions(userId: string): Promise<Map<string, number>> {
+async function getAccountPredictions(userId: string, rangeEnd: Date): Promise<Map<string, number>> {
   const now = new Date();
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const endOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
 
   const rows = await prisma.$queryRaw<PredictionRow[]>(Prisma.sql`
     SELECT last_tx.account_id, SUM(rp."amount") AS predicted_debit
@@ -237,7 +263,7 @@ async function getAccountPredictions(userId: string): Promise<Map<string, number
     WHERE rp."userId" = ${userId}
       AND rp."isActive" = true
       AND rp."nextOccurrenceDate" >= ${today}::date
-      AND rp."nextOccurrenceDate" <= ${endOfMonth}::date
+      AND rp."nextOccurrenceDate" <= ${rangeEnd}::date
       AND rp."amount" IS NOT NULL
     GROUP BY last_tx.account_id
   `);
@@ -251,9 +277,10 @@ async function getAccountPredictions(userId: string): Promise<Map<string, number
 
 // ─── getAccountSummaries ──────────────────────────────────────────────────────
 
-export async function getAccountSummaries(userId: string): Promise<AccountSummaryDto[]> {
-  const { start, end } = currentMonthBounds();
-
+export async function getAccountSummaries(
+  userId: string,
+  range: ResolvedRange,
+): Promise<AccountSummaryDto[]> {
   const [balanceRows, recentRows, predictionMap] = await Promise.all([
     prisma.$queryRaw<AccountBalanceRow[]>(Prisma.sql`
       SELECT
@@ -263,9 +290,13 @@ export async function getAccountSummaries(userId: string): Promise<AccountSummar
         a."isHidden"                                                     AS is_hidden,
         COALESCE(SUM(COALESCE(t."credit", 0) - COALESCE(t."debit", 0)), 0) AS balance,
         COALESCE(SUM(
-          CASE WHEN t."accountingDate" >= ${start} AND t."accountingDate" < ${end}
+          CASE WHEN t."accountingDate" >= ${range.start} AND t."accountingDate" < ${range.end}
                THEN COALESCE(t."credit", 0) - COALESCE(t."debit", 0) ELSE 0 END
-        ), 0)                                                            AS monthly_variation,
+        ), 0)                                                            AS range_variation,
+        COALESCE(SUM(
+          CASE WHEN t."accountingDate" >= ${range.start}
+               THEN COALESCE(t."credit", 0) - COALESCE(t."debit", 0) ELSE 0 END
+        ), 0)                                                            AS net_since_range_start,
         a."lastKnownBalance"                                             AS last_known_balance,
         a."lastKnownBalanceDate"                                         AS last_known_balance_date,
         COALESCE(SUM(
@@ -302,7 +333,7 @@ export async function getAccountSummaries(userId: string): Promise<AccountSummar
       WHERE rn <= 5
       ORDER BY account_id, date DESC
     `),
-    getAccountPredictions(userId),
+    getAccountPredictions(userId, range.end),
   ]);
 
   // Group recent rows by accountId
@@ -330,13 +361,19 @@ export async function getAccountSummaries(userId: string): Promise<AccountSummar
       : null;
     const upcomingDebit = predictionMap.get(row.account_id) ?? 0;
     const endOfMonthPrediction = currentBalance !== null ? currentBalance - upcomingDebit : null;
+    const netSinceRangeStart = toNum(row.net_since_range_start);
+    const balanceAtRangeStart =
+      currentBalance !== null
+        ? currentBalance - netSinceRangeStart
+        : toNum(row.balance) - netSinceRangeStart;
     return {
       accountId: row.account_id,
       label: row.account_label,
       accountNumber: row.account_number,
       isHidden: row.is_hidden,
       balance: toNum(row.balance),
-      monthlyVariation: toNum(row.monthly_variation),
+      rangeVariation: toNum(row.range_variation),
+      balanceAtRangeStart,
       currentBalance,
       balanceDate: balanceDate as string | null,
       endOfMonthPrediction,
@@ -347,10 +384,10 @@ export async function getAccountSummaries(userId: string): Promise<AccountSummar
 
 // ─── getCategoryComparison ────────────────────────────────────────────────────
 
-export async function getCategoryComparison(userId: string): Promise<CategoryComparisonDto> {
-  const curr = currentMonthBounds();
-  const prev = prevMonthBounds();
-
+export async function getCategoryComparison(
+  userId: string,
+  range: ResolvedRange,
+): Promise<CategoryComparisonDto> {
   const queryCategorySpending = (start: Date, end: Date) =>
     prisma.$queryRaw<CategorySpendingRow[]>(Prisma.sql`
       SELECT
@@ -382,8 +419,8 @@ export async function getCategoryComparison(userId: string): Promise<CategoryCom
     `);
 
   const [currentRows, previousRows] = await Promise.all([
-    queryCategorySpending(curr.start, curr.end),
-    queryCategorySpending(prev.start, prev.end),
+    queryCategorySpending(range.start, range.end),
+    queryCategorySpending(range.prevStart, range.prevEnd),
   ]);
 
   return buildCategoryComparison(currentRows, previousRows);
@@ -391,11 +428,16 @@ export async function getCategoryComparison(userId: string): Promise<CategoryCom
 
 // ─── getDashboard ─────────────────────────────────────────────────────────────
 
-export async function getDashboard(userId: string): Promise<DashboardResponseDto> {
+export async function getDashboard(
+  userId: string,
+  params: DateRangeParams = {},
+): Promise<DashboardResponseDto> {
+  const range = resolveRange(params);
+
   const [summary, accounts, categoryComparison] = await Promise.all([
-    getGlobalSummary(userId),
-    getAccountSummaries(userId),
-    getCategoryComparison(userId),
+    getGlobalSummary(userId, range),
+    getAccountSummaries(userId, range),
+    getCategoryComparison(userId, range),
   ]);
 
   // totalBalance = sum of currentBalance for visible accounts (real balances override the tx sum)

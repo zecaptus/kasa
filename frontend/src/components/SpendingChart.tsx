@@ -17,11 +17,11 @@ interface ChartRow {
 function buildChartData(
   currentMonth: CategorySpendingDto[],
   previousMonth: CategorySpendingDto[],
-  otherLabel: string,
+  labelMap: Record<string, string>,
 ): ChartRow[] {
   const prevMap = new Map(previousMonth.map((c) => [c.slug, c.amount]));
   return currentMonth.map((c) => ({
-    name: c.slug === 'other' ? otherLabel : c.name,
+    name: labelMap[c.slug] ?? c.name,
     current: c.amount,
     previous: prevMap.get(c.slug) ?? 0,
   }));
@@ -29,13 +29,17 @@ function buildChartData(
 
 function SpendingChart({ categoryComparison }: Props) {
   const intl = useIntl();
-  const otherLabel = intl.formatMessage({ id: 'dashboard.chart.other' });
+  const slugLabels: Record<string, string> = {
+    __aggregate_other__: intl.formatMessage({ id: 'dashboard.chart.other' }),
+    uncategorized: intl.formatMessage({ id: 'transactions.category.none' }),
+  };
   const currentLabel = intl.formatMessage({ id: 'dashboard.chart.currentMonth' });
   const previousLabel = intl.formatMessage({ id: 'dashboard.chart.previousMonth' });
   const titleLabel = intl.formatMessage({ id: 'dashboard.chart.title' });
   const emptyLabel = intl.formatMessage({ id: 'dashboard.chart.empty' });
 
   const { currentMonth } = categoryComparison;
+  console.log(currentMonth)
 
   if (currentMonth.length === 0) {
     return (
@@ -49,7 +53,7 @@ function SpendingChart({ categoryComparison }: Props) {
     );
   }
 
-  const rows = buildChartData(currentMonth, categoryComparison.previousMonth, otherLabel);
+  const rows = buildChartData(currentMonth, categoryComparison.previousMonth, slugLabels);
 
   const chartConfig: ChartConfig = {
     current: { label: currentLabel, color: 'hsl(142 76% 36%)' },

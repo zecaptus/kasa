@@ -18,7 +18,8 @@ export interface AccountSummaryDto {
   accountNumber: string;
   isHidden: boolean;
   balance: number;
-  monthlyVariation: number;
+  rangeVariation: number;
+  balanceAtRangeStart: number;
   currentBalance: number | null;
   balanceDate: string | null;
   endOfMonthPrediction: number | null;
@@ -51,6 +52,11 @@ export interface DashboardResponseDto {
   categoryComparison: CategoryComparisonDto;
 }
 
+export interface DashboardQueryParams {
+  from: string;
+  to: string;
+}
+
 // ─── API ──────────────────────────────────────────────────────────────────────
 
 export const dashboardApi = createApi({
@@ -58,8 +64,8 @@ export const dashboardApi = createApi({
   baseQuery: baseQueryWithReauth,
   tagTypes: ['Dashboard'],
   endpoints: (builder) => ({
-    getDashboard: builder.query<DashboardResponseDto, void>({
-      query: () => '/dashboard',
+    getDashboard: builder.query<DashboardResponseDto, DashboardQueryParams>({
+      query: ({ from, to }) => `/dashboard?from=${from}&to=${to}`,
       keepUnusedDataFor: 60,
       providesTags: ['Dashboard'],
     }),

@@ -65,7 +65,10 @@ export function PocketForm({ initialValues, onSuccess, onCancel }: Props) {
   const intl = useIntl();
   const isEdit = !!initialValues;
 
-  const { data: dashboardData } = useGetDashboardQuery();
+  const now = new Date();
+  const defaultFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const defaultTo = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const { data: dashboardData } = useGetDashboardQuery({ from: defaultFrom, to: defaultTo });
   const accounts = dashboardData?.accounts ?? [];
 
   const {
