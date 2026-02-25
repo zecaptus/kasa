@@ -1,5 +1,8 @@
+import { prisma } from '@kasa/db';
 import Router from '@koa/router';
 import { requireAuth } from '../middleware/auth.js';
+import { aiCategorizeBatch } from '../services/aiCategorization.service.js';
+import { config } from '../config.js';
 import {
   createCategory,
   createCategoryRule,
@@ -97,6 +100,37 @@ router.delete('/:id', async (ctx: Router.RouterContext) => {
     return;
   }
 
+  ctx.body = result;
+});
+
+// ─── AI ──────────────────────────────────────────────────────────────────────
+
+// GET /api/categories/ai-status
+router.get('/ai-status', async (ctx: Router.RouterContext) => {
+  ctx.body = { enabled: config.AI_CATEGORIZATION_ENABLED };
+});
+
+// POST /api/categories/ai-categorize
+router.post('/ai-categorize', async (ctx: Router.RouterContext) => {
+  const userId = ctx.state.user.sub as string;
+
+  if (!config.AI_CATEGORIZATION_ENABLED) {
+    ctx.status = 503;
+    ctx.body = { error: 'AI_DISABLED', message: 'AI categorization is not enabled' };
+    return;
+  }
+
+  const uncategorized = await prisma.importedTransaction.findMany({
+    where: { userId, categorySource: 'NONE' },
+    select: { id: true, label: true, categorySource: true },
+  });
+
+  if (uncategorized.length === 0) {
+    ctx.body = { categorized: 0, rulesCreated: 0 };
+    return;
+  }
+
+  const result = await aiCategorizeBatch(userId, uncategorized);
   ctx.body = result;
 });
 
