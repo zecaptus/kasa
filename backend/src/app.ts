@@ -11,6 +11,7 @@ import importRouter from './routes/import.router';
 import pocketsRouter from './routes/pockets.router';
 import recurringPatternsRouter from './routes/recurringPatterns.router';
 import transactionsRouter from './routes/transactions.router';
+import transferLabelRulesRouter from './routes/transferLabels.router';
 
 function createApp(): Koa {
   const app = new Koa();
@@ -59,6 +60,8 @@ function createApp(): Koa {
   app.use(bankAccountsRouter.allowedMethods());
   app.use(recurringPatternsRouter.routes());
   app.use(recurringPatternsRouter.allowedMethods());
+  app.use(transferLabelRulesRouter.routes());
+  app.use(transferLabelRulesRouter.allowedMethods());
 
   return app;
 }

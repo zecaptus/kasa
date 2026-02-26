@@ -1,4 +1,4 @@
-import { type CategoryRule, prisma } from '@kasa/db';
+import { type CategoryRule, type Prisma, prisma } from '@kasa/db';
 
 // ─── Talisman bigram dice ─────────────────────────────────────────────────────
 
@@ -67,9 +67,14 @@ export interface CategorizationResult {
   matchMethod: 'exact' | 'fuzzy';
 }
 
-export function matchRules(label: string, rules: CategoryRule[]): CategorizationResult | null {
+export function matchRules(
+  label: string,
+  rules: CategoryRule[],
+  txAmount?: Prisma.Decimal | null,
+): CategorizationResult | null {
   const normalizedLabel = normalize(label);
   for (const rule of rules) {
+    if (rule.amount !== null && (txAmount == null || !rule.amount.equals(txAmount))) continue;
     const normKeyword = normalize(rule.keyword);
     if (normalizedLabel.includes(normKeyword)) {
       return {
@@ -95,15 +100,22 @@ export function matchRules(label: string, rules: CategoryRule[]): Categorization
 
 export async function bulkCategorizeTransactions(
   userId: string,
-  transactions: Array<{ id: string; label: string; categorySource: string }>,
+  transactions: Array<{
+    id: string;
+    label: string;
+    categorySource: string;
+    debit?: Prisma.Decimal | null;
+    credit?: Prisma.Decimal | null;
+  }>,
 ): Promise<number> {
   const rules = await loadRules(userId);
   let count = 0;
 
   for (const tx of transactions) {
-    if (tx.categorySource === 'MANUAL') continue;
+    if (tx.categorySource === 'MANUAL' || tx.categorySource === 'AI') continue;
 
-    const result = matchRules(tx.label, rules);
+    const txAmount = tx.debit ?? tx.credit ?? null;
+    const result = matchRules(tx.label, rules, txAmount);
     if (result) {
       await prisma.importedTransaction.update({
         where: { id: tx.id },
@@ -125,7 +137,7 @@ export async function bulkCategorizeTransactions(
 export async function recategorizeUncategorized(userId: string): Promise<number> {
   const transactions = await prisma.importedTransaction.findMany({
     where: { userId, categorySource: 'NONE' },
-    select: { id: true, label: true, categorySource: true },
+    select: { id: true, label: true, categorySource: true, debit: true, credit: true },
   });
   return bulkCategorizeTransactions(userId, transactions);
 }

@@ -11,6 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@kasa/db": "workspace:*",
     "@koa/bodyparser": "^5.0.0",
     "@koa/multer": "^4.0.0",

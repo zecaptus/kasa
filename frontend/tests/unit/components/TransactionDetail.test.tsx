@@ -1,11 +1,13 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
 import { Provider } from 'react-redux';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TransactionDetail } from '../../../src/components/TransactionDetail';
 import enMessages from '../../../src/i18n/en.json';
 import type { UnifiedTransactionDto } from '../../../src/services/transactionsApi';
 import { store } from '../../../src/store';
+
+const mockUpdateCategory = vi.fn();
 
 vi.mock('../../../src/services/recurringPatternsApi', async (importOriginal) => {
   const actual =
@@ -20,7 +22,7 @@ vi.mock('../../../src/services/transactionsApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/services/transactionsApi')>();
   return {
     ...actual,
-    useUpdateTransactionCategoryMutation: () => [vi.fn(), { isLoading: false }],
+    useUpdateTransactionCategoryMutation: () => [mockUpdateCategory, { isLoading: false }],
     useListCategoriesQuery: () => ({
       data: {
         categories: [
@@ -73,6 +75,10 @@ function renderDetail(transaction: UnifiedTransactionDto | null, onClose = vi.fn
 }
 
 describe('TransactionDetail', () => {
+  beforeEach(() => {
+    mockUpdateCategory.mockReset();
+  });
+
   it('renders nothing when transaction is null', () => {
     const { container } = renderDetail(null);
     expect(container.firstChild).toBeNull();
@@ -159,5 +165,14 @@ describe('TransactionDetail', () => {
   it('renders status badge for imported transaction', () => {
     renderDetail(mockTransaction);
     expect(screen.getByText('Unreconciled')).toBeDefined();
+  });
+
+  it('calls updateCategory when a category button is clicked', async () => {
+    renderDetail(mockTransaction);
+    const categoryButton = screen.getByRole('button', { name: /alimentation/i });
+    fireEvent.click(categoryButton);
+    await waitFor(() => {
+      expect(mockUpdateCategory).toHaveBeenCalledWith({ id: 'tx1', categoryId: 'cat1' });
+    });
   });
 });

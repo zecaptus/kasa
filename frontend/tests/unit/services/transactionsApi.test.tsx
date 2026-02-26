@@ -9,6 +9,7 @@ import {
   useCreateCategoryRuleMutation,
   useDeleteCategoryMutation,
   useDeleteCategoryRuleMutation,
+  useDeleteTransferLabelRuleMutation,
   useGetTransactionQuery,
   useListCategoriesQuery,
   useListCategoryRulesQuery,
@@ -18,6 +19,7 @@ import {
   useUpdateCategoryMutation,
   useUpdateCategoryRuleMutation,
   useUpdateTransactionCategoryMutation,
+  useUpdateTransferLabelMutation,
 } from '../../../src/services/transactionsApi';
 import { store } from '../../../src/store';
 
@@ -222,6 +224,30 @@ describe('mutation query functions (coverage)', () => {
     await act(async () => {
       try {
         await mutate();
+      } catch {}
+    });
+  });
+
+  it('deleteTransferLabelRule query function is invokable', async () => {
+    const { result } = renderHook(() => useDeleteTransferLabelRuleMutation(), {
+      wrapper: isolatedWrapper,
+    });
+    const [mutate] = result.current;
+    await act(async () => {
+      try {
+        await mutate('rule-abc');
+      } catch {}
+    });
+  });
+
+  it('updateTransferLabel query function is invokable', async () => {
+    const { result } = renderHook(() => useUpdateTransferLabelMutation(), {
+      wrapper: isolatedWrapper,
+    });
+    const [mutate] = result.current;
+    await act(async () => {
+      try {
+        await mutate({ id: 'tx-123', label: 'My label' });
       } catch {}
     });
   });

@@ -83,6 +83,18 @@ function BalanceDisplay({ account }: { account: AccountSummaryDto }) {
             )}
           </p>
         )}
+        <p className="mt-1 text-xs text-slate-400">
+          {intl.formatMessage(
+            { id: 'dashboard.account.startingBalance' },
+            {
+              amount: intl.formatNumber(account.balanceAtRangeStart, {
+                style: 'currency',
+                currency: 'EUR',
+                minimumFractionDigits: 2,
+              }),
+            },
+          )}
+        </p>
         {showPrediction && (
           <p className="mt-1.5 text-xs text-slate-400">
             {intl.formatMessage({ id: 'dashboard.account.prediction.label' })}{' '}
@@ -251,7 +263,7 @@ export function AccountCard({ account, pockets }: Props) {
             </button>
           </div>
         )}
-        {!isRenaming && <VariationBadge value={account.monthlyVariation} />}
+        {!isRenaming && <VariationBadge value={account.rangeVariation} />}
       </div>
 
       {/* Account number */}

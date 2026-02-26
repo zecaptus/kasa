@@ -96,6 +96,7 @@ export async function createCategoryRule(
   userId: string,
   keyword: string,
   categoryId: string,
+  amount?: number | null,
 ): Promise<CategoryRule> {
   // Verify category exists and belongs to user or is system
   const cat = await prisma.category.findFirst({
@@ -107,7 +108,7 @@ export async function createCategoryRule(
   }
 
   const rule = await prisma.categoryRule.create({
-    data: { keyword, categoryId, userId, isSystem: false },
+    data: { keyword, categoryId, userId, isSystem: false, amount: amount ?? null },
   });
   invalidateRuleCache(userId);
   return rule;
@@ -116,7 +117,7 @@ export async function createCategoryRule(
 export async function updateCategoryRule(
   userId: string,
   ruleId: string,
-  updates: { keyword?: string; categoryId?: string },
+  updates: { keyword?: string; categoryId?: string; amount?: number | null },
 ): Promise<CategoryRule | null> {
   const rule = await prisma.categoryRule.findFirst({ where: { id: ruleId } });
   if (!rule) return null;

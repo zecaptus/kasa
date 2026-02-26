@@ -6,11 +6,14 @@ import {
   prisma,
   type ReconciliationStatus,
 } from '@kasa/db';
+import { config } from '../config.js';
+import { aiCategorizeBatch } from './aiCategorization.service.js';
 import { bulkCategorizeTransactions } from './categorization.service.js';
 import { parseSgCsv } from './csvParser.service.js';
 import { runReconciliation } from './reconciliation.service.js';
 import { detectRecurringPatterns } from './recurringPatterns.service.js';
 import { detectTransferPairs } from './transferDetection.service.js';
+import { applyTransferLabelRules } from './transferLabels.service.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -195,6 +198,23 @@ export async function importCsv(
       categorySource: t.categorySource,
     })),
   );
+
+  // Apply transfer label rules to new transactions
+  await applyTransferLabelRules(
+    userId,
+    session.transactions.map((t) => t.id),
+  );
+
+  // AI-categorize remaining NONE transactions (if enabled)
+  if (config.AI_CATEGORIZATION_ENABLED) {
+    const uncategorized = await prisma.importedTransaction.findMany({
+      where: { sessionId: session.session.id, categorySource: 'NONE' },
+      select: { id: true, label: true, detail: true, categorySource: true },
+    });
+    if (uncategorized.length > 0) {
+      await aiCategorizeBatch(userId, uncategorized);
+    }
+  }
 
   // Detect recurring patterns after import
   await detectRecurringPatterns(userId);

@@ -44,6 +44,13 @@ function dec(v: number): Prisma.Decimal {
 
 const USER_ID = 'user-abc-123';
 
+const mockRange = {
+  start: new Date('2025-01-01T00:00:00Z'),
+  end: new Date('2025-02-01T00:00:00Z'),
+  prevStart: new Date('2024-12-01T00:00:00Z'),
+  prevEnd: new Date('2025-01-01T00:00:00Z'),
+};
+
 // ── getGlobalSummary ──────────────────────────────────────────────────────────
 
 describe('getGlobalSummary', () => {
@@ -68,7 +75,7 @@ describe('getGlobalSummary', () => {
         },
       ]);
 
-    const result: DashboardSummaryDto = await getGlobalSummary(USER_ID);
+    const result: DashboardSummaryDto = await getGlobalSummary(USER_ID, mockRange);
 
     expect(result.totalBalance).toBe(4200);
     expect(result.monthlyIncome).toBe(2500);
@@ -91,7 +98,7 @@ describe('getGlobalSummary', () => {
         },
       ]);
 
-    const result: DashboardSummaryDto = await getGlobalSummary(USER_ID);
+    const result: DashboardSummaryDto = await getGlobalSummary(USER_ID, mockRange);
 
     expect(result.totalBalance).toBe(0);
     expect(result.monthlySpending).toBe(0);
@@ -114,7 +121,7 @@ describe('getGlobalSummary', () => {
         },
       ]);
 
-    const result: DashboardSummaryDto = await getGlobalSummary(USER_ID);
+    const result: DashboardSummaryDto = await getGlobalSummary(USER_ID, mockRange);
 
     expect(result.totalBalance).toBe(0);
     expect(result.monthlySpending).toBe(0);
@@ -133,7 +140,7 @@ describe('getGlobalSummary', () => {
       ])
       .mockResolvedValueOnce([{ monthly_spending_manual: dec(0) }]);
 
-    const result: DashboardSummaryDto = await getGlobalSummary(USER_ID);
+    const result: DashboardSummaryDto = await getGlobalSummary(USER_ID, mockRange);
 
     expect(result.netCashFlow).toBeCloseTo(-300);
   });
@@ -154,7 +161,8 @@ describe('getAccountSummaries', () => {
         account_number: null,
         is_hidden: false,
         balance: dec(1200),
-        monthly_variation: dec(-300),
+        range_variation: dec(-300),
+        net_since_range_start: dec(0),
         last_known_balance: null,
         last_known_balance_date: null,
         balance_delta: dec(0),
@@ -165,7 +173,8 @@ describe('getAccountSummaries', () => {
         account_number: null,
         is_hidden: false,
         balance: dec(5000),
-        monthly_variation: dec(50),
+        range_variation: dec(50),
+        net_since_range_start: dec(0),
         last_known_balance: null,
         last_known_balance_date: null,
         balance_delta: dec(0),
@@ -208,14 +217,14 @@ describe('getAccountSummaries', () => {
       .mockResolvedValueOnce(recentRows)
       .mockResolvedValueOnce([]);
 
-    const result: AccountSummaryDto[] = await getAccountSummaries(USER_ID);
+    const result: AccountSummaryDto[] = await getAccountSummaries(USER_ID, mockRange);
 
     expect(result).toHaveLength(2);
 
     const courant = result.find((a) => a.label === 'Compte courant');
     expect(courant).toBeDefined();
     expect(courant?.balance).toBe(1200);
-    expect(courant?.monthlyVariation).toBe(-300);
+    expect(courant?.rangeVariation).toBe(-300);
     expect(courant?.recentTransactions).toHaveLength(2);
     expect(courant?.recentTransactions[0]?.id).toBe('tx1');
     expect(courant?.recentTransactions[0]?.date).toBe('2025-01-15');
@@ -230,12 +239,17 @@ describe('getAccountSummaries', () => {
   it('returns account with empty recentTransactions when no recent rows exist', async () => {
     mockQueryRaw
       .mockResolvedValueOnce([
-        { account_label: 'Compte pro', balance: dec(8000), monthly_variation: dec(0) },
+        {
+          account_label: 'Compte pro',
+          balance: dec(8000),
+          range_variation: dec(0),
+          net_since_range_start: dec(0),
+        },
       ])
       .mockResolvedValueOnce([]) // no recent transactions at all
       .mockResolvedValueOnce([]); // no predictions
 
-    const result: AccountSummaryDto[] = await getAccountSummaries(USER_ID);
+    const result: AccountSummaryDto[] = await getAccountSummaries(USER_ID, mockRange);
 
     expect(result).toHaveLength(1);
     expect(result[0]?.label).toBe('Compte pro');
@@ -245,7 +259,7 @@ describe('getAccountSummaries', () => {
   it('returns empty array when user has no accounts', async () => {
     mockQueryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
-    const result: AccountSummaryDto[] = await getAccountSummaries(USER_ID);
+    const result: AccountSummaryDto[] = await getAccountSummaries(USER_ID, mockRange);
 
     expect(result).toHaveLength(0);
   });
@@ -280,12 +294,12 @@ describe('getCategoryComparison', () => {
 
     mockQueryRaw.mockResolvedValueOnce(currentRows).mockResolvedValueOnce(previousRows);
 
-    const result: CategoryComparisonDto = await getCategoryComparison(USER_ID);
+    const result: CategoryComparisonDto = await getCategoryComparison(USER_ID, mockRange);
 
     expect(result.currentMonth).toHaveLength(3);
     expect(result.previousMonth).toHaveLength(3);
 
-    const otherCurrent = result.currentMonth.find((c) => c.slug === 'other');
+    const otherCurrent = result.currentMonth.find((c) => c.slug === '__aggregate_other__');
     expect(otherCurrent).toBeUndefined();
 
     // Sorted by amount desc: Loyer first
@@ -313,19 +327,19 @@ describe('getCategoryComparison', () => {
 
     mockQueryRaw.mockResolvedValueOnce(currentRows).mockResolvedValueOnce(previousRows);
 
-    const result: CategoryComparisonDto = await getCategoryComparison(USER_ID);
+    const result: CategoryComparisonDto = await getCategoryComparison(USER_ID, mockRange);
 
     // Should be 9 named + 1 other = 10
     expect(result.currentMonth).toHaveLength(10);
     expect(result.previousMonth).toHaveLength(10);
 
-    const otherCurrent = result.currentMonth.find((c) => c.slug === 'other');
+    const otherCurrent = result.currentMonth.find((c) => c.slug === '__aggregate_other__');
     expect(otherCurrent).toBeDefined();
     expect(otherCurrent?.categoryId).toBeNull();
     // Two overflow categories: amounts at index 9 = 100-9*5=55 and index 10 = 100-10*5=50
     expect(otherCurrent?.amount).toBeCloseTo(55 + 50);
 
-    const otherPrev = result.previousMonth.find((c) => c.slug === 'other');
+    const otherPrev = result.previousMonth.find((c) => c.slug === '__aggregate_other__');
     expect(otherPrev).toBeDefined();
     // Previous overflow: 90-9*5=45 and 90-10*5=40
     expect(otherPrev?.amount).toBeCloseTo(45 + 40);
@@ -334,7 +348,7 @@ describe('getCategoryComparison', () => {
   it('returns empty comparison arrays when user has no spending data', async () => {
     mockQueryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
-    const result: CategoryComparisonDto = await getCategoryComparison(USER_ID);
+    const result: CategoryComparisonDto = await getCategoryComparison(USER_ID, mockRange);
 
     expect(result.currentMonth).toHaveLength(0);
     expect(result.previousMonth).toHaveLength(0);
@@ -355,7 +369,7 @@ describe('getCategoryComparison', () => {
 
     mockQueryRaw.mockResolvedValueOnce(currentRows).mockResolvedValueOnce(previousRows);
 
-    const result: CategoryComparisonDto = await getCategoryComparison(USER_ID);
+    const result: CategoryComparisonDto = await getCategoryComparison(USER_ID, mockRange);
 
     expect(result.currentMonth).toHaveLength(1);
     expect(result.previousMonth).toHaveLength(1);

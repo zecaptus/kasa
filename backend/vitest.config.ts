@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
+    setupFiles: ['./tests/setup.ts'],
     env: {
       DATABASE_URL: 'postgresql://localhost:5432/kasa_test',
       JWT_SECRET: 'test-secret-key-that-is-at-least-32-chars-long',

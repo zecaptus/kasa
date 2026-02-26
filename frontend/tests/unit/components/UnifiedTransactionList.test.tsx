@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { IntlProvider } from 'react-intl';
 import { describe, expect, it, vi } from 'vitest';
@@ -61,38 +61,38 @@ describe('UnifiedTransactionList', () => {
 
   it('renders a list of transactions with both labels visible', () => {
     renderList([mockDebit, mockCredit]);
-    expect(screen.getByText('Supermarket')).toBeDefined();
-    expect(screen.getByText('Salary')).toBeDefined();
+    expect(screen.getAllByText('Supermarket')[0]).toBeDefined();
+    expect(screen.getAllByText('Salary')[0]).toBeDefined();
   });
 
   it('displays minus sign for debit transactions', () => {
     renderList([mockDebit]);
-    expect(screen.getByText(/-/)).toBeDefined();
+    expect(screen.getAllByText(/-/)[0]).toBeDefined();
   });
 
   it('displays plus sign for credit transactions', () => {
     renderList([mockCredit]);
-    expect(screen.getByText(/\+/)).toBeDefined();
+    expect(screen.getAllByText(/\+/)[0]).toBeDefined();
   });
 
   it('displays category name when category is set', () => {
     renderList([mockCredit]);
-    expect(screen.getByText('Income')).toBeDefined();
+    expect(screen.getAllByText('Income')[0]).toBeDefined();
   });
 
   it('displays "Uncategorized" when category is null', () => {
     renderList([mockDebit]);
-    expect(screen.getByText('Uncategorized')).toBeDefined();
+    expect(screen.getAllByText('Uncategorized')[0]).toBeDefined();
   });
 
   it('displays "Imported" source badge for IMPORTED_TRANSACTION type', () => {
     renderList([mockDebit]);
-    expect(screen.getByText('Imported')).toBeDefined();
+    expect(screen.getAllByText('Imported')[0]).toBeDefined();
   });
 
   it('displays "Manual" source badge for MANUAL_EXPENSE type', () => {
     renderList([mockCredit]);
-    expect(screen.getByText('Manual')).toBeDefined();
+    expect(screen.getAllByText('Manual')[0]).toBeDefined();
   });
 
   it('shows detail text when detail is present', () => {
@@ -101,17 +101,62 @@ describe('UnifiedTransactionList', () => {
       detail: 'Reference 12345',
     };
     renderList([txWithDetail]);
-    expect(screen.getByText('Reference 12345')).toBeDefined();
+    expect(screen.getAllByText('Reference 12345')[0]).toBeDefined();
   });
 
   it('calls onSelect when a list item is clicked', async () => {
     const onSelect = vi.fn();
     renderList([mockDebit], onSelect);
 
-    const item = screen.getByRole('button');
+    const item = screen.getAllByRole('button')[0];
     await userEvent.click(item);
 
     expect(onSelect).toHaveBeenCalledOnce();
     expect(onSelect).toHaveBeenCalledWith(mockDebit);
+  });
+
+  it('triggers onSelect when Enter is pressed on a transaction item', () => {
+    const onSelect = vi.fn();
+    renderList([mockDebit], onSelect);
+    const items = screen.getAllByRole('button');
+    fireEvent.keyDown(items[0], { key: 'Enter' });
+    expect(onSelect).toHaveBeenCalledWith(mockDebit);
+  });
+
+  it('triggers onSelect when Space is pressed on a transaction item', () => {
+    const onSelect = vi.fn();
+    renderList([mockDebit], onSelect);
+    const items = screen.getAllByRole('button');
+    fireEvent.keyDown(items[0], { key: ' ' });
+    expect(onSelect).toHaveBeenCalledWith(mockDebit);
+  });
+
+  it('renders transfer pair row (debit + credit side by side)', () => {
+    const debitTx: UnifiedTransactionDto = {
+      ...mockDebit,
+      id: 'dt-1',
+      transferPeerId: 'ct-1',
+      transferPeerAccountLabel: null,
+      transferLabel: null,
+      accountId: null,
+      accountLabel: null,
+      recurringPatternId: null,
+      label: 'Transfer Out',
+    };
+    const creditTx: UnifiedTransactionDto = {
+      ...mockCredit,
+      id: 'ct-1',
+      transferPeerId: 'dt-1',
+      transferPeerAccountLabel: null,
+      transferLabel: null,
+      accountId: null,
+      accountLabel: null,
+      recurringPatternId: null,
+      label: 'Transfer In',
+      direction: 'credit',
+    };
+    renderList([debitTx, creditTx]);
+    expect(screen.getAllByText('Transfer Out')[0]).toBeDefined();
+    expect(screen.getAllByText('Transfer In')[0]).toBeDefined();
   });
 });

@@ -1,5 +1,8 @@
+import { prisma } from '@kasa/db';
 import Router from '@koa/router';
+import { config } from '../config.js';
 import { requireAuth } from '../middleware/auth.js';
+import { aiCategorizeBatch } from '../services/aiCategorization.service.js';
 import {
   createCategory,
   createCategoryRule,
@@ -16,6 +19,12 @@ import {
   recategorizeUncategorized,
 } from '../services/categorization.service.js';
 import { suggestRules } from '../services/ruleSuggestions.service.js';
+
+function validateOptionalAmount(raw: unknown): string | null {
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw !== 'number' || raw <= 0) return 'amount must be a positive number';
+  return null;
+}
 
 const router = new Router({ prefix: '/api/categories' });
 
@@ -100,6 +109,37 @@ router.delete('/:id', async (ctx: Router.RouterContext) => {
   ctx.body = result;
 });
 
+// ─── AI ──────────────────────────────────────────────────────────────────────
+
+// GET /api/categories/ai-status
+router.get('/ai-status', async (ctx: Router.RouterContext) => {
+  ctx.body = { enabled: config.AI_CATEGORIZATION_ENABLED };
+});
+
+// POST /api/categories/ai-categorize
+router.post('/ai-categorize', async (ctx: Router.RouterContext) => {
+  const userId = ctx.state.user.sub as string;
+
+  if (!config.AI_CATEGORIZATION_ENABLED) {
+    ctx.status = 503;
+    ctx.body = { error: 'AI_DISABLED', message: 'AI categorization is not enabled' };
+    return;
+  }
+
+  const uncategorized = await prisma.importedTransaction.findMany({
+    where: { userId, categorySource: 'NONE' },
+    select: { id: true, label: true, detail: true, categorySource: true },
+  });
+
+  if (uncategorized.length === 0) {
+    ctx.body = { categorized: 0, rulesCreated: 0 };
+    return;
+  }
+
+  const result = await aiCategorizeBatch(userId, uncategorized);
+  ctx.body = result;
+});
+
 // ─── Rules ────────────────────────────────────────────────────────────────────
 
 // GET /api/categories/suggestions
@@ -126,9 +166,10 @@ router.get('/rules', async (ctx: Router.RouterContext) => {
 // POST /api/categories/rules
 router.post('/rules', async (ctx: Router.RouterContext) => {
   const userId = ctx.state.user.sub as string;
-  const body = ctx.request.body as { keyword?: unknown; categoryId?: unknown };
+  const body = ctx.request.body as { keyword?: unknown; categoryId?: unknown; amount?: unknown };
   const keyword = typeof body?.keyword === 'string' ? body.keyword.trim() : '';
   const categoryId = typeof body?.categoryId === 'string' ? body.categoryId : '';
+  const rawAmount = body?.amount;
 
   if (!keyword) {
     ctx.status = 400;
@@ -145,8 +186,15 @@ router.post('/rules', async (ctx: Router.RouterContext) => {
     ctx.body = { error: 'VALIDATION_ERROR', message: 'categoryId is required' };
     return;
   }
+  const amtErr = validateOptionalAmount(rawAmount);
+  if (amtErr) {
+    ctx.status = 400;
+    ctx.body = { error: 'VALIDATION_ERROR', message: amtErr };
+    return;
+  }
 
-  const rule = await createCategoryRule(userId, keyword, categoryId);
+  const amount = rawAmount != null ? (rawAmount as number) : null;
+  const rule = await createCategoryRule(userId, keyword, categoryId, amount);
   invalidateRuleCache(userId);
   const categorized = await recategorizeUncategorized(userId);
   ctx.status = 201;
@@ -157,11 +205,20 @@ router.post('/rules', async (ctx: Router.RouterContext) => {
 router.patch('/rules/:id', async (ctx: Router.RouterContext) => {
   const userId = ctx.state.user.sub as string;
   const { id } = ctx.params as { id: string };
-  const body = ctx.request.body as { keyword?: unknown; categoryId?: unknown };
+  const body = ctx.request.body as { keyword?: unknown; categoryId?: unknown; amount?: unknown };
 
-  const updates: { keyword?: string; categoryId?: string } = {};
+  const updates: { keyword?: string; categoryId?: string; amount?: number | null } = {};
   if (typeof body?.keyword === 'string') updates.keyword = body.keyword.trim();
   if (typeof body?.categoryId === 'string') updates.categoryId = body.categoryId;
+  if (body?.amount !== undefined) {
+    const patchAmtErr = body.amount !== null ? validateOptionalAmount(body.amount) : null;
+    if (patchAmtErr) {
+      ctx.status = 400;
+      ctx.body = { error: 'VALIDATION_ERROR', message: patchAmtErr };
+      return;
+    }
+    updates.amount = body.amount as number | null;
+  }
 
   const rule = await updateCategoryRule(userId, id, updates);
   if (!rule) {

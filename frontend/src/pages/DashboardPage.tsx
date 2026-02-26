@@ -1,7 +1,8 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { AccountCard } from '../components/AccountCard';
 import { DashboardSkeleton } from '../components/DashboardSkeleton';
+import { DateRangePicker } from '../components/DateRangePicker';
 import { GlobalSummaryCard } from '../components/GlobalSummaryCard';
 import { RecurringPatternRow } from '../components/RecurringPatternRow';
 import { useGetDashboardQuery } from '../services/dashboardApi';
@@ -16,27 +17,51 @@ function ChartFallback() {
   );
 }
 
+function formatDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function defaultFrom(): string {
+  const now = new Date();
+  return formatDate(new Date(now.getFullYear(), now.getMonth(), 1));
+}
+
+function defaultTo(): string {
+  return formatDate(new Date());
+}
+
 export function DashboardPage() {
   const intl = useIntl();
-  const { data, isLoading, isError, refetch } = useGetDashboardQuery();
+  const [from, setFrom] = useState(defaultFrom);
+  const [to, setTo] = useState(defaultTo);
+
+  const { data, isLoading, isError, refetch } = useGetDashboardQuery({ from, to });
   const { data: pocketsData } = useListPocketsQuery();
   const { data: recurringData } = useListRecurringPatternsQuery();
 
+  // Filter upcoming patterns within the selected range end
+  const rangeEnd = new Date(`${to}T23:59:59`);
   const now = new Date();
-  const in30Days = new Date(now);
-  in30Days.setDate(in30Days.getDate() + 30);
 
   const upcomingPatterns = (recurringData?.patterns ?? [])
     .filter((p) => {
       if (!p.isActive || !p.nextOccurrenceDate) return false;
       const next = new Date(p.nextOccurrenceDate);
-      return next >= now && next <= in30Days;
+      return next >= now && next <= rangeEnd;
     })
     .sort((a, b) => {
       if (!a.nextOccurrenceDate) return 1;
       if (!b.nextOccurrenceDate) return -1;
       return a.nextOccurrenceDate.localeCompare(b.nextOccurrenceDate);
     });
+
+  function handleRangeChange(newFrom: string, newTo: string) {
+    setFrom(newFrom);
+    setTo(newTo);
+  }
 
   if (isLoading) {
     return (
@@ -68,8 +93,16 @@ export function DashboardPage() {
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
+      {/* Date range picker */}
+      <DateRangePicker from={from} to={to} onChange={handleRangeChange} />
+
       {/* Global summary */}
-      <GlobalSummaryCard summary={data.summary} />
+      <GlobalSummaryCard
+        summary={data.summary}
+        startingBalance={data.accounts
+          .filter((a) => !a.isHidden)
+          .reduce((sum, a) => sum + a.balanceAtRangeStart, 0)}
+      />
 
       {/* Per-account cards */}
       {data.accounts.length === 0 ? (

@@ -4,6 +4,7 @@ import type { DashboardSummaryDto } from '../services/dashboardApi';
 
 interface Props {
   summary: DashboardSummaryDto;
+  startingBalance: number;
 }
 
 interface MetricProps {
@@ -41,13 +42,14 @@ function Metric({ labelId, value, highlightPositive = false }: MetricProps) {
   );
 }
 
-export function GlobalSummaryCard({ summary }: Props) {
+export function GlobalSummaryCard({ summary, startingBalance }: Props) {
   const intl = useIntl();
 
   return (
     <section aria-label={intl.formatMessage({ id: 'dashboard.title' })} className="card p-6">
       <h2 className="mb-4 section-title">{intl.formatMessage({ id: 'dashboard.title' })}</h2>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+        <Metric labelId="dashboard.summary.startingBalance" value={startingBalance} />
         <Metric labelId="dashboard.summary.totalBalance" value={summary.totalBalance} />
         <Metric labelId="dashboard.summary.monthlyIncome" value={summary.monthlyIncome} />
         <Metric labelId="dashboard.summary.monthlySpending" value={summary.monthlySpending} />

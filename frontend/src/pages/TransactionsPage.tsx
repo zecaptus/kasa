@@ -1,3 +1,4 @@
+import { Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { ExpenseForm } from '../components/ExpenseForm';
@@ -8,6 +9,8 @@ import {
   type ListTransactionsParams,
   transactionsApi,
   type UnifiedTransactionDto,
+  useAiCategorizeMutation,
+  useGetAiStatusQuery,
   useListTransactionsQuery,
 } from '../services/transactionsApi';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -23,12 +26,15 @@ function buildParams(filters: Filters, cursor: string | undefined): ListTransact
   if (filters.direction) p.direction = filters.direction;
   if (filters.search) p.search = filters.search;
   if (filters.accountId) p.accountId = filters.accountId;
+  if (filters.transferLabel) p.transferLabel = filters.transferLabel;
   if (cursor) p.cursor = cursor;
   return p;
 }
 
 function filtersKey(f: Filters): string {
-  return [f.from, f.to, f.categoryId, f.direction, f.search, f.accountId].join('|');
+  return [f.from, f.to, f.categoryId, f.direction, f.search, f.accountId, f.transferLabel].join(
+    '|',
+  );
 }
 
 // ─── AddButton ────────────────────────────────────────────────────────────────
@@ -90,6 +96,28 @@ function ExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
   );
 }
 
+// ─── AiCategorizeButton ──────────────────────────────────────────────────────
+
+function AiCategorizeButton({ hasUncategorized }: { hasUncategorized: boolean }) {
+  const intl = useIntl();
+  const { data: aiStatus } = useGetAiStatusQuery();
+  const [aiCategorize, { isLoading }] = useAiCategorizeMutation();
+
+  if (!aiStatus?.enabled) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => aiCategorize()}
+      disabled={isLoading || !hasUncategorized}
+      className="flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700 shadow-sm transition-colors hover:bg-violet-100 disabled:opacity-50 dark:border-violet-800 dark:bg-violet-900/30 dark:text-violet-300 dark:hover:bg-violet-900/50"
+    >
+      <Sparkles className="size-4" />
+      {isLoading ? '…' : intl.formatMessage({ id: 'categories.ai.button' })}
+    </button>
+  );
+}
+
 // ─── TransactionsPage ─────────────────────────────────────────────────────────
 
 export function TransactionsPage() {
@@ -117,6 +145,7 @@ export function TransactionsPage() {
 
   const currentPage = data?.transactions ?? [];
   const allTransactions = [...extra, ...currentPage];
+  const hasUncategorized = allTransactions.some((tx) => tx.categorySource === 'NONE');
 
   function handleLoadMore() {
     if (data?.nextCursor && !isFetching) {
@@ -135,13 +164,16 @@ export function TransactionsPage() {
   const showSkeleton = isLoading && extra.length === 0;
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6">
+    <div className="mx-auto max-w-2xl px-4 py-6 lg:max-w-5xl">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <h1 className="font-display text-2xl font-semibold tracking-tight text-kasa-dark dark:text-slate-100">
           {intl.formatMessage({ id: 'transactions.title' })}
         </h1>
-        <AddButton onClick={() => setShowForm(true)} />
+        <div className="flex items-center gap-2">
+          <AiCategorizeButton hasUncategorized={hasUncategorized} />
+          <AddButton onClick={() => setShowForm(true)} />
+        </div>
       </div>
 
       {/* Filters */}

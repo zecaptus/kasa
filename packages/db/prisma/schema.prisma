@@ -22,6 +22,7 @@ enum ReconciliationStatus {
 enum CategorySource {
   NONE
   AUTO
+  AI
   MANUAL
 }
 
@@ -61,6 +62,7 @@ model User {
   ownedAccounts        Account[]      @relation("AccountOwner")
   viewableAccounts     AccountViewer[]
   recurringPatterns    RecurringPattern[]
+  transferLabelRules   TransferLabelRule[]
 }
 
 model Account {
@@ -167,19 +169,22 @@ model ImportedTransaction {
   categorySource CategorySource       @default(NONE)
   createdAt      DateTime             @default(now())
 
-  categoryRuleId     String?
-  recurringPatternId String?
-  transferPeerId     String?
+  categoryRuleId       String?
+  recurringPatternId   String?
+  transferPeerId       String?
+  transferLabel        String?              @db.VarChar(100)
+  transferLabelRuleId  String?
 
-  session          ImportSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  account          Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  category         Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  categoryRule     CategoryRule?     @relation(fields: [categoryRuleId], references: [id], onDelete: SetNull)
-  recurringPattern RecurringPattern? @relation(fields: [recurringPatternId], references: [id], onDelete: SetNull)
-  reconciliation   Reconciliation?
-  transferPeer     ImportedTransaction?  @relation("TransferLink", fields: [transferPeerId], references: [id], onDelete: SetNull)
-  transferPeerOf   ImportedTransaction[] @relation("TransferLink")
+  session             ImportSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account             Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category            Category?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryRule        CategoryRule?      @relation(fields: [categoryRuleId], references: [id], onDelete: SetNull)
+  recurringPattern    RecurringPattern?  @relation(fields: [recurringPatternId], references: [id], onDelete: SetNull)
+  reconciliation      Reconciliation?
+  transferPeer        ImportedTransaction?  @relation("TransferLink", fields: [transferPeerId], references: [id], onDelete: SetNull)
+  transferPeerOf      ImportedTransaction[] @relation("TransferLink")
+  transferLabelRule   TransferLabelRule? @relation(fields: [transferLabelRuleId], references: [id], onDelete: SetNull)
 
   @@unique([accountId, accountingDate, label, debit, credit], name: "dedup_key")
   @@index([userId, status])
@@ -189,6 +194,7 @@ model ImportedTransaction {
   @@index([categoryRuleId])
   @@index([recurringPatternId])
   @@index([transferPeerId])
+  @@index([transferLabelRuleId])
 }
 
 model RecurringPattern {
@@ -254,6 +260,7 @@ model CategoryRule {
   keyword    String   @db.VarChar(100)
   categoryId String
   isSystem   Boolean  @default(false)
+  amount     Decimal? @db.Decimal(12, 2)
   createdAt  DateTime @default(now())
 
   user         User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -262,6 +269,21 @@ model CategoryRule {
 
   @@index([userId])
   @@index([isSystem])
+}
+
+model TransferLabelRule {
+  id        String   @id @default(cuid())
+  userId    String?
+  keyword   String   @db.VarChar(100)
+  label     String   @db.VarChar(100)
+  isSystem  Boolean  @default(false)
+  amount    Decimal? @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+
+  user         User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions ImportedTransaction[]
+
+  @@index([userId])
 }
 
 model Reconciliation {

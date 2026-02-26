@@ -3,7 +3,10 @@ import { useIntl } from 'react-intl';
 import { cn } from '../lib/cn';
 import { inputCls } from '../lib/inputCls';
 import { useListBankAccountsQuery } from '../services/bankAccountsApi';
-import { useListCategoriesQuery } from '../services/transactionsApi';
+import {
+  useListCategoriesQuery,
+  useListTransferLabelRulesQuery,
+} from '../services/transactionsApi';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import {
   resetFilters,
@@ -51,6 +54,7 @@ interface AdvancedFiltersProps {
   filters: TransactionFiltersState;
   categories: { id: string; name: string }[];
   accounts: { id: string; label: string; accountNumber: string }[];
+  transferLabels: string[];
   hasAnyActive: boolean;
   update: (patch: Partial<TransactionFiltersState>) => void;
   onReset: () => void;
@@ -64,6 +68,7 @@ function AdvancedFilters({
   filters,
   categories,
   accounts,
+  transferLabels,
   hasAnyActive,
   update,
   onReset,
@@ -99,6 +104,22 @@ function AdvancedFilters({
           {accounts.map((acc) => (
             <option key={acc.id} value={acc.id}>
               {acc.label || acc.accountNumber}
+            </option>
+          ))}
+        </select>
+      )}
+
+      {transferLabels.length > 0 && (
+        <select
+          value={filters.transferLabel ?? ''}
+          onChange={(e) => update({ transferLabel: e.target.value || undefined })}
+          className={inputCls()}
+        >
+          <option value="">{intl.formatMessage({ id: 'transfer.labels.title' })}</option>
+          <option value="none">{intl.formatMessage({ id: 'transfer.labels.none' })}</option>
+          {transferLabels.map((label) => (
+            <option key={label} value={label}>
+              {label}
             </option>
           ))}
         </select>
@@ -157,8 +178,10 @@ export function TransactionFilters() {
   const filters = useAppSelector((state) => state.transactions.filters);
   const { data: categoriesData } = useListCategoriesQuery();
   const { data: accountsData } = useListBankAccountsQuery();
+  const { data: transferLabelRulesData } = useListTransferLabelRulesQuery();
   const categories = categoriesData?.categories ?? [];
   const accounts = accountsData?.accounts ?? [];
+  const transferLabels = [...new Set((transferLabelRulesData?.rules ?? []).map((r) => r.label))];
 
   const advancedCount = [
     filters.from,
@@ -166,6 +189,7 @@ export function TransactionFilters() {
     filters.categoryId,
     filters.direction,
     filters.accountId,
+    filters.transferLabel,
   ].filter(Boolean).length;
 
   const [open, setOpen] = useState(advancedCount > 0);
@@ -212,6 +236,7 @@ export function TransactionFilters() {
           filters={filters}
           categories={categories}
           accounts={accounts}
+          transferLabels={transferLabels}
           hasAnyActive={hasAnyActive}
           update={update}
           onReset={() => dispatch(resetFilters())}
