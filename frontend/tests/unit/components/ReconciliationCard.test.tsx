@@ -248,4 +248,18 @@ describe('ReconciliationCard', () => {
     const statusBadge = document.querySelector('.bg-slate-100');
     expect(statusBadge).toBeDefined();
   });
+
+  it('renders no action button when status is RECONCILED with no reconciliationId', () => {
+    const transaction: ImportedTransactionDto = {
+      ...baseTransaction,
+      status: 'RECONCILED',
+      reconciliation: null,
+    };
+
+    renderCard(transaction);
+
+    expect(screen.queryByRole('button', { name: /ignore/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /un-ignore/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /undo/i })).toBeNull();
+  });
 });

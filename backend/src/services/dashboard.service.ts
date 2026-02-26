@@ -200,7 +200,6 @@ function buildCategoryComparison(
     currentMonth.push({ ...OTHER_ENTRY, amount: otherCurrentAmount });
     previousMonth.push({ ...OTHER_ENTRY, amount: otherPreviousAmount });
   }
-  console.log(currentMonth);
   return { currentMonth, previousMonth };
 }
 

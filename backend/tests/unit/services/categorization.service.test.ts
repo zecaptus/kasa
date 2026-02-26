@@ -7,19 +7,24 @@ const mockUpdateMany = vi.fn();
 const mockFindMany = vi.fn();
 const mockUpdate = vi.fn();
 
-vi.mock('@kasa/db', () => ({
-  prisma: {
-    importedTransaction: {
-      updateMany: (...args: unknown[]) => mockUpdateMany(...args),
-      findMany: (...args: unknown[]) => mockFindMany(...args),
-      update: (...args: unknown[]) => mockUpdate(...args),
+vi.mock('@kasa/db', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@kasa/db')>();
+  return {
+    ...actual,
+    prisma: {
+      importedTransaction: {
+        updateMany: (...args: unknown[]) => mockUpdateMany(...args),
+        findMany: (...args: unknown[]) => mockFindMany(...args),
+        update: (...args: unknown[]) => mockUpdate(...args),
+      },
+      categoryRule: {
+        findMany: (...args: unknown[]) => mockFindMany(...args),
+      },
     },
-    categoryRule: {
-      findMany: (...args: unknown[]) => mockFindMany(...args),
-    },
-  },
-}));
+  };
+});
 
+import { Prisma } from '@kasa/db';
 // Import after mock
 import {
   matchRules,
@@ -30,7 +35,7 @@ import {
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function mkRule(id: string, keyword: string, categoryId: string, isSystem = false): CategoryRule {
-  return { id, keyword, categoryId, isSystem, userId: 'u1', createdAt: new Date() };
+  return { id, keyword, categoryId, isSystem, userId: 'u1', createdAt: new Date(), amount: null };
 }
 
 // ── normalize ─────────────────────────────────────────────────────────────────
@@ -103,6 +108,31 @@ describe('matchRules', () => {
     const rules = [mkRule('r1', 'amazon', 'cat-shopping', true)];
     const result = matchRules('AMAZON MARKETPLACE', rules);
     expect(result?.isSystem).toBe(true);
+  });
+
+  it('matches rule without amount regardless of tx amount', () => {
+    // amount: null means keyword-only matching — existing behavior preserved
+    const rules = [mkRule('r1', 'carrefour', 'cat-food')];
+    const result = matchRules('VIR CARREFOUR MARKET', rules, new Prisma.Decimal(999));
+    expect(result).not.toBeNull();
+    expect(result?.categoryId).toBe('cat-food');
+  });
+
+  it('matches rule with amount when tx amount equals rule amount', () => {
+    const rule = { ...mkRule('r1', 'carrefour', 'cat-food'), amount: new Prisma.Decimal(100) };
+    const result = matchRules('VIR CARREFOUR MARKET', [rule], new Prisma.Decimal(100));
+    expect(result).not.toBeNull();
+    expect(result?.categoryId).toBe('cat-food');
+  });
+
+  it('skips rule with amount when tx amount does not match', () => {
+    const rule = { ...mkRule('r1', 'carrefour', 'cat-food'), amount: new Prisma.Decimal(100) };
+    expect(matchRules('VIR CARREFOUR MARKET', [rule], new Prisma.Decimal(200))).toBeNull();
+  });
+
+  it('skips rule with amount when no tx amount is provided', () => {
+    const rule = { ...mkRule('r1', 'carrefour', 'cat-food'), amount: new Prisma.Decimal(100) };
+    expect(matchRules('VIR CARREFOUR MARKET', [rule])).toBeNull();
   });
 });
 

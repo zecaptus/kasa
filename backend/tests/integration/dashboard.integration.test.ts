@@ -188,7 +188,7 @@ describe('GET /api/dashboard', () => {
     const cookie = await makeAuthCookie(userId);
     await request(app).get('/api/dashboard').set('Cookie', cookie);
 
-    expect(mockGetDashboard).toHaveBeenCalledWith(userId);
+    expect(mockGetDashboard).toHaveBeenCalledWith(userId, {});
   });
 
   it('returns 200 with all-zero summary for new user with no transactions', async () => {

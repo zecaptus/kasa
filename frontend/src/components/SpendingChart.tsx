@@ -39,7 +39,6 @@ function SpendingChart({ categoryComparison }: Props) {
   const emptyLabel = intl.formatMessage({ id: 'dashboard.chart.empty' });
 
   const { currentMonth } = categoryComparison;
-  console.log(currentMonth)
 
   if (currentMonth.length === 0) {
     return (

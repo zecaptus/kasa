@@ -29,8 +29,8 @@ describe('GlobalSummaryCard', () => {
   it('renders all four metric labels', () => {
     renderCard(baseSummary);
     expect(screen.getByText('Total balance')).toBeDefined();
-    expect(screen.getByText('Monthly income')).toBeDefined();
-    expect(screen.getByText('Monthly spending')).toBeDefined();
+    expect(screen.getByText('Income')).toBeDefined();
+    expect(screen.getByText('Spending')).toBeDefined();
     expect(screen.getByText('Net cash flow')).toBeDefined();
   });
 

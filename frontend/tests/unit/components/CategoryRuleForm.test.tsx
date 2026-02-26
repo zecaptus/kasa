@@ -82,4 +82,25 @@ describe('CategoryRuleForm', () => {
     const input = screen.getByLabelText(/keyword/i);
     expect((input as HTMLInputElement).value).toBe('SNCF');
   });
+
+  it('renders amount input', () => {
+    renderForm();
+    expect(screen.getByLabelText(/exact amount/i)).toBeDefined();
+  });
+
+  it('prepopulates amount field in update mode', () => {
+    renderForm({
+      ruleId: 'rule1',
+      initialValues: { keyword: 'NETFLIX', categoryId: 'cat1', amount: 99.99 },
+    });
+    const input = screen.getByLabelText(/exact amount/i);
+    expect((input as HTMLInputElement).value).toBe('99.99');
+  });
+
+  it('accepts amount input', () => {
+    renderForm();
+    const input = screen.getByLabelText(/exact amount/i);
+    fireEvent.change(input, { target: { value: '150.50' } });
+    expect((input as HTMLInputElement).value).toBe('150.50');
+  });
 });

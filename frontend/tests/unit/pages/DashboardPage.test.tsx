@@ -18,9 +18,15 @@ const mockData: DashboardResponseDto = {
   },
   accounts: [
     {
+      accountId: 'acc-001',
+      accountNumber: 'FR761234',
       label: 'Compte courant',
+      isHidden: false,
       balance: 1250.5,
-      monthlyVariation: 200,
+      rangeVariation: 200,
+      currentBalance: null,
+      balanceDate: null,
+      endOfMonthPrediction: null,
       recentTransactions: [],
     },
   ],

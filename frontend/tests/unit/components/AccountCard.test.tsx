@@ -33,7 +33,7 @@ const baseAccount: AccountSummaryDto = {
   accountNumber: 'FR761234',
   isHidden: false,
   balance: 1250.5,
-  monthlyVariation: 200,
+  rangeVariation: 200,
   currentBalance: null,
   balanceDate: null,
   endOfMonthPrediction: null,
@@ -68,13 +68,13 @@ describe('AccountCard', () => {
     expect(screen.getByText('Main account')).toBeDefined();
   });
 
-  it('shows upward indicator for positive monthlyVariation', () => {
-    renderCard({ ...baseAccount, monthlyVariation: 300 });
+  it('shows upward indicator for positive rangeVariation', () => {
+    renderCard({ ...baseAccount, rangeVariation: 300 });
     expect(screen.getByText('↑')).toBeDefined();
   });
 
-  it('shows downward indicator for negative monthlyVariation', () => {
-    renderCard({ ...baseAccount, monthlyVariation: -150 });
+  it('shows downward indicator for negative rangeVariation', () => {
+    renderCard({ ...baseAccount, rangeVariation: -150 });
     expect(screen.getByText('↓')).toBeDefined();
   });
 
