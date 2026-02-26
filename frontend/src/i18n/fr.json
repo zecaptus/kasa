@@ -246,5 +246,7 @@
   "transfer.labels.keyword.placeholder": "Ex : livret",
   "transfer.labels.labeled": "{count, plural, one {# transaction étiquetée} other {# transactions étiquetées}}",
   "transfer.labels.none": "Aucune étiquette",
-  "transfer.labels.apply.all": "Appliquer toutes les règles"
+  "transfer.labels.apply.all": "Appliquer toutes les règles",
+  "rule.amount.label": "Montant exact (optionnel)",
+  "rule.amount.placeholder": "Montant exact (optionnel)"
 }

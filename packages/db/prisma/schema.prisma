@@ -260,6 +260,7 @@ model CategoryRule {
   keyword    String   @db.VarChar(100)
   categoryId String
   isSystem   Boolean  @default(false)
+  amount     Decimal? @db.Decimal(12, 2)
   createdAt  DateTime @default(now())
 
   user         User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -276,6 +277,7 @@ model TransferLabelRule {
   keyword   String   @db.VarChar(100)
   label     String   @db.VarChar(100)
   isSystem  Boolean  @default(false)
+  amount    Decimal? @db.Decimal(12, 2)
   createdAt DateTime @default(now())
 
   user         User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)

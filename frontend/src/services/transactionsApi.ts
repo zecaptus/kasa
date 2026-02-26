@@ -23,6 +23,7 @@ export interface CategoryRuleDto {
   isSystem: boolean;
   userId: string | null;
   createdAt: string;
+  amount?: number | null;
   categorized?: number;
   transactionCount?: number;
 }
@@ -34,6 +35,7 @@ export interface TransferLabelRuleDto {
   label: string;
   isSystem: boolean;
   createdAt: string;
+  amount?: number | null;
   transactionCount?: number;
 }
 
@@ -190,7 +192,10 @@ export const transactionsApi = createApi({
       providesTags: ['CategoryRule'],
     }),
 
-    createCategoryRule: builder.mutation<CategoryRuleDto, { keyword: string; categoryId: string }>({
+    createCategoryRule: builder.mutation<
+      CategoryRuleDto,
+      { keyword: string; categoryId: string; amount?: number | null }
+    >({
       query: (body) => ({
         url: '/categories/rules',
         method: 'POST',
@@ -201,7 +206,7 @@ export const transactionsApi = createApi({
 
     updateCategoryRule: builder.mutation<
       CategoryRuleDto,
-      { id: string; keyword?: string; categoryId?: string }
+      { id: string; keyword?: string; categoryId?: string; amount?: number | null }
     >({
       query: ({ id, ...body }) => ({
         url: `/categories/rules/${id}`,
@@ -271,7 +276,7 @@ export const transactionsApi = createApi({
 
     createTransferLabelRule: builder.mutation<
       TransferLabelRuleDto & { labeled: number },
-      { keyword: string; label: string }
+      { keyword: string; label: string; amount?: number | null }
     >({
       query: (body) => ({
         url: '/transfer-label-rules',
@@ -283,7 +288,7 @@ export const transactionsApi = createApi({
 
     updateTransferLabelRule: builder.mutation<
       TransferLabelRuleDto & { labeled: number },
-      { id: string; keyword?: string; label?: string }
+      { id: string; keyword?: string; label?: string; amount?: number | null }
     >({
       query: ({ id, ...body }) => ({
         url: `/transfer-label-rules/${id}`,

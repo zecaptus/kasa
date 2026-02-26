@@ -1,4 +1,4 @@
-import { prisma, type TransferLabelRule } from '@kasa/db';
+import { type Prisma, prisma, type TransferLabelRule } from '@kasa/db';
 import { normalize } from './categorization.service.js';
 
 // ─── Talisman bigram dice ─────────────────────────────────────────────────────
@@ -26,14 +26,21 @@ function fuzzyMatch(normLabel: string, normKeyword: string): boolean {
 }
 
 function findMatchingRule(
-  tx: { label: string; detail: string | null },
+  tx: {
+    label: string;
+    detail: string | null;
+    debit: Prisma.Decimal | null;
+    credit: Prisma.Decimal | null;
+  },
   rules: TransferLabelRule[],
 ): TransferLabelRule | null {
   const normLabel = normalize(tx.label);
   const normDetail = tx.detail ? normalize(tx.detail) : '';
   const combinedText = `${normLabel} ${normDetail}`.trim();
+  const txAmount = tx.debit ?? tx.credit;
 
   for (const rule of rules) {
+    if (rule.amount !== null && (txAmount == null || !rule.amount.equals(txAmount))) continue;
     const normKeyword = normalize(rule.keyword);
     const matched = combinedText.includes(normKeyword) || fuzzyMatch(combinedText, normKeyword);
     if (matched) {
@@ -71,9 +78,10 @@ export async function createTransferLabelRule(
   userId: string,
   keyword: string,
   label: string,
+  amount?: number | null,
 ): Promise<TransferLabelRule> {
   return prisma.transferLabelRule.create({
-    data: { userId, keyword, label },
+    data: { userId, keyword, label, amount: amount ?? null },
   });
 }
 
@@ -82,7 +90,7 @@ export async function createTransferLabelRule(
 export async function updateTransferLabelRule(
   userId: string,
   ruleId: string,
-  data: { keyword?: string; label?: string },
+  data: { keyword?: string; label?: string; amount?: number | null },
 ): Promise<TransferLabelRule | null> {
   const rule = await prisma.transferLabelRule.findFirst({
     where: { id: ruleId, userId },
@@ -120,7 +128,7 @@ export async function applyTransferLabelRules(userId: string, txIds?: string[]):
 
   const transactions = await prisma.importedTransaction.findMany({
     where,
-    select: { id: true, label: true, detail: true },
+    select: { id: true, label: true, detail: true, debit: true, credit: true },
   });
 
   let count = 0;

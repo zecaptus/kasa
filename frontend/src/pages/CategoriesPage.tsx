@@ -21,6 +21,23 @@ import {
   useRecategorizeAllMutation,
 } from '../services/transactionsApi';
 
+function buildCategoryRuleFormValues(
+  editingRule: CategoryRuleDto | null,
+  pendingSuggestion: string | undefined,
+): { keyword: string; categoryId: string; amount?: number | null } | undefined {
+  if (editingRule !== null) {
+    return {
+      keyword: editingRule.keyword,
+      categoryId: editingRule.categoryId,
+      ...(editingRule.amount != null ? { amount: editingRule.amount } : {}),
+    };
+  }
+  if (pendingSuggestion !== undefined) {
+    return { keyword: pendingSuggestion, categoryId: '' };
+  }
+  return undefined;
+}
+
 interface RuleFormSectionProps {
   showRuleForm: boolean;
   editingRule: CategoryRuleDto | null;
@@ -42,11 +59,7 @@ function RuleFormSection({
 }: RuleFormSectionProps) {
   const intl = useIntl();
   const formKey = editingRule ? editingRule.id : (pendingSuggestion ?? '');
-  const formInitialValues = editingRule
-    ? { keyword: editingRule.keyword, categoryId: editingRule.categoryId }
-    : pendingSuggestion !== undefined
-      ? { keyword: pendingSuggestion, categoryId: '' }
-      : undefined;
+  const formInitialValues = buildCategoryRuleFormValues(editingRule, pendingSuggestion);
   return (
     <>
       <RuleSuggestions suggestions={suggestions} onAccept={onAcceptSuggestion} />
@@ -168,6 +181,11 @@ function TransferLabelSection() {
             <li key={rule.id} className="flex items-center gap-3 px-4 py-3">
               <span className="min-w-0 flex-1 truncate text-sm text-slate-700 dark:text-slate-300">
                 <span className="font-mono text-xs text-slate-500">{rule.keyword}</span>
+                {rule.amount != null && (
+                  <span className="text-xs text-slate-400 ml-1">
+                    {intl.formatNumber(rule.amount, { style: 'currency', currency: 'EUR' })}
+                  </span>
+                )}
                 <span className="mx-2 text-slate-300">→</span>
                 <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
                   {rule.label}
@@ -208,6 +226,7 @@ function TransferLabelSection() {
                   initialValues: {
                     keyword: editingTransferLabelRule.keyword,
                     label: editingTransferLabelRule.label,
+                    amount: editingTransferLabelRule.amount ?? null,
                   },
                   ruleId: editingTransferLabelRule.id,
                 }
@@ -392,6 +411,11 @@ export function CategoriesPage() {
                   <li key={rule.id} className="flex items-center gap-3 px-4 py-3">
                     <span className="min-w-0 flex-1 truncate text-sm text-slate-700 dark:text-slate-300">
                       <span className="font-mono text-xs text-slate-500">{rule.keyword}</span>
+                      {rule.amount != null && (
+                        <span className="text-xs text-slate-400 ml-1">
+                          {intl.formatNumber(rule.amount, { style: 'currency', currency: 'EUR' })}
+                        </span>
+                      )}
                       <span className="mx-2 text-slate-300">→</span>
                       {cat && (
                         <span className="inline-flex items-center gap-1.5">
@@ -426,6 +450,11 @@ export function CategoriesPage() {
                   <li key={rule.id} className="flex items-center gap-3 px-4 py-3">
                     <span className="min-w-0 flex-1 truncate text-sm text-slate-700 dark:text-slate-300">
                       <span className="font-mono text-xs text-slate-500">{rule.keyword}</span>
+                      {rule.amount != null && (
+                        <span className="text-xs text-slate-400 ml-1">
+                          {intl.formatNumber(rule.amount, { style: 'currency', currency: 'EUR' })}
+                        </span>
+                      )}
                       <span className="mx-2 text-slate-300">→</span>
                       {cat && (
                         <span className="inline-flex items-center gap-1.5">

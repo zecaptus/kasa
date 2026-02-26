@@ -8,6 +8,59 @@ import {
   updateTransferLabelRule,
 } from '../services/transferLabels.service.js';
 
+function validateKeyword(v: unknown): string | null {
+  if (typeof v !== 'string' || v.trim() === '' || v.length > 100) {
+    return 'keyword must be a non-empty string (≤100 chars)';
+  }
+  return null;
+}
+
+function validateLabel(v: unknown): string | null {
+  if (typeof v !== 'string' || v.trim() === '' || v.length > 100) {
+    return 'label must be a non-empty string (≤100 chars)';
+  }
+  return null;
+}
+
+function validateOptionalAmount(v: unknown): string | null {
+  if (v === undefined || v === null) return null;
+  if (typeof v !== 'number' || v <= 0) return 'amount must be a positive number';
+  return null;
+}
+
+function processAmountField(raw: unknown): { error: string } | { value: number | null } {
+  if (raw === null) return { value: null };
+  if (typeof raw === 'number' && raw > 0) return { value: raw };
+  return { error: 'amount must be a positive number' };
+}
+
+function buildTransferLabelData(body: { keyword?: unknown; label?: unknown; amount?: unknown }): {
+  error?: string;
+  data: { keyword?: string; label?: string; amount?: number | null };
+} {
+  const data: { keyword?: string; label?: string; amount?: number | null } = {};
+
+  if (body?.keyword !== undefined) {
+    const err = validateKeyword(body.keyword);
+    if (err) return { error: err, data };
+    data.keyword = (body.keyword as string).trim();
+  }
+
+  if (body?.label !== undefined) {
+    const err = validateLabel(body.label);
+    if (err) return { error: err, data };
+    data.label = (body.label as string).trim();
+  }
+
+  if (body?.amount !== undefined) {
+    const result = processAmountField(body.amount);
+    if ('error' in result) return { error: result.error, data };
+    data.amount = result.value;
+  }
+
+  return { data };
+}
+
 const router = new Router({ prefix: '/api/transfer-label-rules' });
 
 router.use(requireAuth);
@@ -22,30 +75,34 @@ router.get('/', async (ctx: Router.RouterContext) => {
 // POST /api/transfer-label-rules
 router.post('/', async (ctx: Router.RouterContext) => {
   const userId = ctx.state.user.sub as string;
-  const body = ctx.request.body as { keyword?: unknown; label?: unknown };
+  const body = ctx.request.body as { keyword?: unknown; label?: unknown; amount?: unknown };
 
-  if (
-    typeof body?.keyword !== 'string' ||
-    body.keyword.trim() === '' ||
-    body.keyword.length > 100
-  ) {
+  const kwErr = validateKeyword(body?.keyword);
+  if (kwErr) {
     ctx.status = 400;
-    ctx.body = {
-      error: 'VALIDATION_ERROR',
-      message: 'keyword must be a non-empty string (≤100 chars)',
-    };
+    ctx.body = { error: 'VALIDATION_ERROR', message: kwErr };
     return;
   }
-  if (typeof body?.label !== 'string' || body.label.trim() === '' || body.label.length > 100) {
+  const lblErr = validateLabel(body?.label);
+  if (lblErr) {
     ctx.status = 400;
-    ctx.body = {
-      error: 'VALIDATION_ERROR',
-      message: 'label must be a non-empty string (≤100 chars)',
-    };
+    ctx.body = { error: 'VALIDATION_ERROR', message: lblErr };
+    return;
+  }
+  const amtErr = validateOptionalAmount(body?.amount);
+  if (amtErr) {
+    ctx.status = 400;
+    ctx.body = { error: 'VALIDATION_ERROR', message: amtErr };
     return;
   }
 
-  const rule = await createTransferLabelRule(userId, body.keyword.trim(), body.label.trim());
+  const amount = body?.amount != null ? (body.amount as number) : null;
+  const rule = await createTransferLabelRule(
+    userId,
+    (body.keyword as string).trim(),
+    (body.label as string).trim(),
+    amount,
+  );
   const labeled = await applyTransferLabelRules(userId);
   ctx.status = 201;
   ctx.body = { ...rule, labeled };
@@ -55,36 +112,13 @@ router.post('/', async (ctx: Router.RouterContext) => {
 router.patch('/:id', async (ctx: Router.RouterContext) => {
   const userId = ctx.state.user.sub as string;
   const { id } = ctx.params as { id: string };
-  const body = ctx.request.body as { keyword?: unknown; label?: unknown };
+  const body = ctx.request.body as { keyword?: unknown; label?: unknown; amount?: unknown };
 
-  const data: { keyword?: string; label?: string } = {};
-
-  if (body?.keyword !== undefined) {
-    if (
-      typeof body.keyword !== 'string' ||
-      body.keyword.trim() === '' ||
-      body.keyword.length > 100
-    ) {
-      ctx.status = 400;
-      ctx.body = {
-        error: 'VALIDATION_ERROR',
-        message: 'keyword must be a non-empty string (≤100 chars)',
-      };
-      return;
-    }
-    data.keyword = body.keyword.trim();
-  }
-
-  if (body?.label !== undefined) {
-    if (typeof body.label !== 'string' || body.label.trim() === '' || body.label.length > 100) {
-      ctx.status = 400;
-      ctx.body = {
-        error: 'VALIDATION_ERROR',
-        message: 'label must be a non-empty string (≤100 chars)',
-      };
-      return;
-    }
-    data.label = body.label.trim();
+  const { error, data } = buildTransferLabelData(body);
+  if (error) {
+    ctx.status = 400;
+    ctx.body = { error: 'VALIDATION_ERROR', message: error };
+    return;
   }
 
   const rule = await updateTransferLabelRule(userId, id, data);

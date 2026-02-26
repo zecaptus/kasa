@@ -21,7 +21,7 @@ function validateRuleForm(
 
 interface CategoryRuleFormProps {
   onSuccess?: (categorized?: number) => void;
-  initialValues?: { keyword: string; categoryId: string };
+  initialValues?: { keyword: string; categoryId: string; amount?: number | null };
   ruleId?: string;
 }
 
@@ -36,6 +36,9 @@ export function CategoryRuleForm({ onSuccess, initialValues, ruleId }: CategoryR
 
   const [keyword, setKeyword] = useState(initialValues?.keyword ?? '');
   const [categoryId, setCategoryId] = useState(initialValues?.categoryId ?? '');
+  const [amount, setAmount] = useState(
+    initialValues?.amount != null ? String(initialValues.amount) : '',
+  );
   const [errors, setErrors] = useState<{ keyword?: string; categoryId?: string }>({});
 
   const categories = categoriesData?.categories ?? [];
@@ -48,9 +51,10 @@ export function CategoryRuleForm({ onSuccess, initialValues, ruleId }: CategoryR
       return;
     }
     setErrors({});
+    const parsedAmount = amount.trim() ? Number(amount) : null;
     const result = isUpdateMode
-      ? await updateRule({ id: ruleId, keyword: keyword.trim(), categoryId })
-      : await createRule({ keyword: keyword.trim(), categoryId });
+      ? await updateRule({ id: ruleId, keyword: keyword.trim(), categoryId, amount: parsedAmount })
+      : await createRule({ keyword: keyword.trim(), categoryId, amount: parsedAmount });
     onSuccess?.('data' in result ? result.data?.categorized : undefined);
   }
 
@@ -77,6 +81,25 @@ export function CategoryRuleForm({ onSuccess, initialValues, ruleId }: CategoryR
         <p className="text-xs text-slate-400">
           {intl.formatMessage({ id: 'categories.rules.hint' })}
         </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <label
+          htmlFor="rule-amount"
+          className="block text-sm font-medium text-slate-600 dark:text-slate-400"
+        >
+          {intl.formatMessage({ id: 'rule.amount.label' })}
+        </label>
+        <input
+          id="rule-amount"
+          type="number"
+          step="0.01"
+          min="0"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder={intl.formatMessage({ id: 'rule.amount.placeholder' })}
+          className={inputCls()}
+        />
       </div>
 
       <div className="space-y-1.5">

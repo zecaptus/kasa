@@ -246,5 +246,7 @@
   "transfer.labels.keyword.placeholder": "E.g. savings",
   "transfer.labels.labeled": "{count, plural, one {# transaction labeled} other {# transactions labeled}}",
   "transfer.labels.none": "No label",
-  "transfer.labels.apply.all": "Apply all rules"
+  "transfer.labels.apply.all": "Apply all rules",
+  "rule.amount.label": "Exact amount (optional)",
+  "rule.amount.placeholder": "Exact amount (optional)"
 }
