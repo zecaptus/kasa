@@ -157,15 +157,27 @@ function AdvancedFilters({
         </select>
       </div>
 
-      {hasAnyActive && (
-        <button
-          type="button"
-          onClick={onReset}
-          className="text-sm font-medium text-kasa-accent hover:underline"
-        >
-          {intl.formatMessage({ id: 'transactions.filter.reset' })}
-        </button>
-      )}
+      <div className="flex items-center justify-between">
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+          <input
+            type="checkbox"
+            checked={filters.recurring ?? false}
+            onChange={(e) => update({ recurring: e.target.checked || undefined })}
+            className="rounded border-slate-300 accent-kasa-accent"
+          />
+          {intl.formatMessage({ id: 'transactions.filter.recurring' })}
+        </label>
+
+        {hasAnyActive && (
+          <button
+            type="button"
+            onClick={onReset}
+            className="text-sm font-medium text-kasa-accent hover:underline"
+          >
+            {intl.formatMessage({ id: 'transactions.filter.reset' })}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -190,6 +202,7 @@ export function TransactionFilters() {
     filters.direction,
     filters.accountId,
     filters.transferLabel,
+    filters.recurring,
   ].filter(Boolean).length;
 
   const [open, setOpen] = useState(advancedCount > 0);

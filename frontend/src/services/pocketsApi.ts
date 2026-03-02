@@ -5,7 +5,7 @@ import { baseQueryWithReauth } from './baseQueryWithReauth';
 
 export interface PocketSummaryDto {
   id: string;
-  accountLabel: string;
+  accountId: string;
   name: string;
   goalAmount: number;
   allocatedAmount: number;
@@ -29,7 +29,7 @@ export interface PocketDetailDto extends PocketSummaryDto {
 }
 
 export interface CreatePocketRequest {
-  accountLabel: string;
+  accountId: string;
   name: string;
   goalAmount: number;
   color: string;

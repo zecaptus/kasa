@@ -32,14 +32,25 @@ function parseListParams(q: Router.RouterContext['query']) {
     search: str(q.search)?.trim() || undefined,
     accountId: str(q.accountId),
     transferLabel: str(q.transferLabel),
+    recurring: q.recurring === 'true' ? true : undefined,
   };
 }
 
 // GET /api/transactions
 router.get('/', async (ctx: Router.RouterContext) => {
   const userId = ctx.state.user.sub as string;
-  const { limit, rawCursor, from, to, categoryId, direction, search, accountId, transferLabel } =
-    parseListParams(ctx.query);
+  const {
+    limit,
+    rawCursor,
+    from,
+    to,
+    categoryId,
+    direction,
+    search,
+    accountId,
+    transferLabel,
+    recurring,
+  } = parseListParams(ctx.query);
 
   const cursor = rawCursor ? decodeCursor(rawCursor) : undefined;
 
@@ -53,6 +64,7 @@ router.get('/', async (ctx: Router.RouterContext) => {
     search,
     accountId,
     transferLabel,
+    recurring,
   });
 
   ctx.body = {
@@ -125,24 +137,24 @@ router.patch('/:id/category', async (ctx: Router.RouterContext) => {
 router.patch('/:id/recurring', async (ctx: Router.RouterContext) => {
   const userId = ctx.state.user.sub as string;
   const { id } = ctx.params as { id: string };
-  const body = ctx.request.body as { recurringPatternId?: unknown };
-  const recurringPatternId =
-    body?.recurringPatternId === null
+  const body = ctx.request.body as { recurringRuleId?: unknown };
+  const recurringRuleId =
+    body?.recurringRuleId === null
       ? null
-      : typeof body?.recurringPatternId === 'string'
-        ? body.recurringPatternId
+      : typeof body?.recurringRuleId === 'string'
+        ? body.recurringRuleId
         : undefined;
 
-  if (recurringPatternId === undefined) {
+  if (recurringRuleId === undefined) {
     ctx.status = 400;
     ctx.body = {
       error: 'VALIDATION_ERROR',
-      message: 'recurringPatternId must be a string or null',
+      message: 'recurringRuleId must be a string or null',
     };
     return;
   }
 
-  const updated = await updateTransactionRecurring(userId, id, recurringPatternId);
+  const updated = await updateTransactionRecurring(userId, id, recurringRuleId);
   if (!updated) {
     ctx.status = 404;
     ctx.body = { error: 'NOT_FOUND' };

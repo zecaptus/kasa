@@ -3,15 +3,6 @@ import { baseQueryWithReauth } from './baseQueryWithReauth';
 
 // ─── DTOs ─────────────────────────────────────────────────────────────────────
 
-export interface RecentTransactionDto {
-  id: string;
-  date: string; // YYYY-MM-DD
-  label: string;
-  amount: number;
-  direction: 'debit' | 'credit';
-  transferPeerAccountLabel: string | null;
-}
-
 export interface AccountSummaryDto {
   accountId: string;
   label: string;
@@ -23,7 +14,6 @@ export interface AccountSummaryDto {
   currentBalance: number | null;
   balanceDate: string | null;
   endOfMonthPrediction: number | null;
-  recentTransactions: RecentTransactionDto[];
 }
 
 export interface DashboardSummaryDto {

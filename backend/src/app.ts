@@ -9,7 +9,7 @@ import dashboardRouter from './routes/dashboard.router';
 import expensesRouter from './routes/expenses.router';
 import importRouter from './routes/import.router';
 import pocketsRouter from './routes/pockets.router';
-import recurringPatternsRouter from './routes/recurringPatterns.router';
+import recurringRulesRouter from './routes/recurringRules.router';
 import transactionsRouter from './routes/transactions.router';
 import transferLabelRulesRouter from './routes/transferLabels.router';
 
@@ -58,8 +58,8 @@ function createApp(): Koa {
   app.use(pocketsRouter.allowedMethods());
   app.use(bankAccountsRouter.routes());
   app.use(bankAccountsRouter.allowedMethods());
-  app.use(recurringPatternsRouter.routes());
-  app.use(recurringPatternsRouter.allowedMethods());
+  app.use(recurringRulesRouter.routes());
+  app.use(recurringRulesRouter.allowedMethods());
   app.use(transferLabelRulesRouter.routes());
   app.use(transferLabelRulesRouter.allowedMethods());
 

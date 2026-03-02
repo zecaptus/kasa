@@ -1,16 +1,21 @@
 import { useIntl } from 'react-intl';
-import { Link, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
+import { PlusIcon } from '../icons/Plus';
+import { PocketIcon } from '../icons/Pocket';
+import { QuitIcon } from '../icons/Quit';
+import { SettingsIcon } from '../icons/Settings';
+import { UploadIcon } from '../icons/Upload';
 import { useLogoutMutation } from '../services/authApi';
 import { loggedOut } from '../store/authSlice';
-import { useAppDispatch, useAppSelector, useIsApiLoading } from '../store/hooks';
-import { KasaLogo } from './KasaLogo';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { Dropdown } from './ui/Dropdown';
+import { DropdownItem } from './ui/DropdownItem';
 
 export function NavBar() {
   const { formatMessage } = useIntl();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
-  const isApiLoading = useIsApiLoading();
   const [logoutMutation, { isLoading }] = useLogoutMutation();
 
   async function handleLogout() {
@@ -24,54 +29,52 @@ export function NavBar() {
   }
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-slate-200/60 bg-white/80 px-4 py-3 backdrop-blur-xl dark:border-slate-800/60 dark:bg-slate-950/80">
-      <div className="mx-auto flex max-w-4xl items-center justify-between">
-        <Link to="/" aria-label={formatMessage({ id: 'nav.home' })}>
-          <KasaLogo loading={isApiLoading} className="h-8 w-auto" />
-        </Link>
-
+    <nav className="sticky top-0 z-50 bg-white/80 px-4 py-3 backdrop-blur-xl dark:bg-slate-950/80">
+      <div className="flex items-center justify-end gap-2">
         {user && (
-          <div className="flex items-center gap-3">
-            <Link
-              to="/import"
-              className="text-sm font-medium text-slate-600 transition-colors hover:text-kasa-accent dark:text-slate-400 dark:hover:text-kasa-accent"
+          <>
+            <Dropdown
+              trigger={
+                <button
+                  type="button"
+                  aria-label={formatMessage({ id: 'nav.new' })}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                >
+                  <PlusIcon className="h-5" />
+                </button>
+              }
             >
-              {formatMessage({ id: 'nav.import' })}
-            </Link>
-            <Link
-              to="/transactions"
-              className="text-sm font-medium text-slate-600 transition-colors hover:text-kasa-accent dark:text-slate-400 dark:hover:text-kasa-accent"
+              <DropdownItem to="/import" icon={<UploadIcon className="h-4" />}>
+                {formatMessage({ id: 'nav.import' })}
+              </DropdownItem>
+              <DropdownItem to="/cagnottes" icon={<PocketIcon className="h-4" />}>
+                {formatMessage({ id: 'pockets.create' })}
+              </DropdownItem>
+            </Dropdown>
+
+            <Dropdown
+              trigger={
+                <button
+                  type="button"
+                  aria-label={user.name}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-kasa-accent text-sm font-semibold text-white"
+                >
+                  {user.name.charAt(0).toUpperCase()}
+                </button>
+              }
             >
-              {formatMessage({ id: 'transactions.title' })}
-            </Link>
-            <Link
-              to="/categories"
-              className="text-sm font-medium text-slate-600 transition-colors hover:text-kasa-accent dark:text-slate-400 dark:hover:text-kasa-accent"
-            >
-              {formatMessage({ id: 'categories.title' })}
-            </Link>
-            <Link
-              to="/cagnottes"
-              className="text-sm font-medium text-slate-600 transition-colors hover:text-kasa-accent dark:text-slate-400 dark:hover:text-kasa-accent"
-            >
-              {formatMessage({ id: 'nav.pockets' })}
-            </Link>
-            <Link
-              to="/profil"
-              className="text-sm font-medium text-slate-600 transition-colors hover:text-kasa-accent dark:text-slate-400 dark:hover:text-kasa-accent"
-            >
-              {user.name}
-            </Link>
-            <div className="h-4 w-px bg-slate-200 dark:bg-slate-700" />
-            <button
-              type="button"
-              onClick={handleLogout}
-              disabled={isLoading}
-              className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800 disabled:opacity-50 dark:text-slate-500 dark:hover:text-slate-200"
-            >
-              {formatMessage({ id: 'auth.logout.button' })}
-            </button>
-          </div>
+              <DropdownItem to="/profil" icon={<SettingsIcon className="h-4" />}>
+                {formatMessage({ id: 'nav.settings' })}
+              </DropdownItem>
+              <DropdownItem
+                onClick={() => void handleLogout()}
+                disabled={isLoading}
+                icon={<QuitIcon className="h-4" />}
+              >
+                {formatMessage({ id: 'auth.logout.button' })}
+              </DropdownItem>
+            </Dropdown>
+          </>
         )}
       </div>
     </nav>

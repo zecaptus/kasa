@@ -31,17 +31,6 @@ enum PocketMovementDir {
   WITHDRAWAL
 }
 
-enum RecurrenceFrequency {
-  WEEKLY
-  MONTHLY
-  ANNUAL
-}
-
-enum RecurrenceSource {
-  AUTO
-  MANUAL
-}
-
 model User {
   id                  String         @id @default(cuid())
   email               String         @unique
@@ -61,7 +50,7 @@ model User {
   pockets              Pocket[]
   ownedAccounts        Account[]      @relation("AccountOwner")
   viewableAccounts     AccountViewer[]
-  recurringPatterns    RecurringPattern[]
+  recurringRules       RecurringRule[]
   transferLabelRules   TransferLabelRule[]
 }
 
@@ -170,7 +159,7 @@ model ImportedTransaction {
   createdAt      DateTime             @default(now())
 
   categoryRuleId       String?
-  recurringPatternId   String?
+  recurringRuleId      String?
   transferPeerId       String?
   transferLabel        String?              @db.VarChar(100)
   transferLabelRuleId  String?
@@ -180,41 +169,55 @@ model ImportedTransaction {
   account             Account            @relation(fields: [accountId], references: [id], onDelete: Cascade)
   category            Category?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   categoryRule        CategoryRule?      @relation(fields: [categoryRuleId], references: [id], onDelete: SetNull)
-  recurringPattern    RecurringPattern?  @relation(fields: [recurringPatternId], references: [id], onDelete: SetNull)
+  recurringRule       RecurringRule?     @relation(fields: [recurringRuleId], references: [id], onDelete: SetNull)
+  pendingMatch        RecurringPendingMatch?
   reconciliation      Reconciliation?
   transferPeer        ImportedTransaction?  @relation("TransferLink", fields: [transferPeerId], references: [id], onDelete: SetNull)
   transferPeerOf      ImportedTransaction[] @relation("TransferLink")
   transferLabelRule   TransferLabelRule? @relation(fields: [transferLabelRuleId], references: [id], onDelete: SetNull)
 
-  @@unique([accountId, accountingDate, label, debit, credit], name: "dedup_key")
+  @@unique([accountId, accountingDate, label, detail, debit, credit], name: "dedup_key")
   @@index([userId, status])
   @@index([sessionId])
   @@index([accountId])
   @@index([categoryId])
   @@index([categoryRuleId])
-  @@index([recurringPatternId])
+  @@index([recurringRuleId])
   @@index([transferPeerId])
   @@index([transferLabelRuleId])
 }
 
-model RecurringPattern {
-  id                 String              @id @default(cuid())
-  userId             String
-  label              String
-  keyword            String
-  amount             Decimal?            @db.Decimal(12, 2)
-  frequency          RecurrenceFrequency
-  source             RecurrenceSource
-  isActive           Boolean             @default(true)
-  nextOccurrenceDate DateTime?           @db.Date
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+model RecurringRule {
+  id           String    @id @default(cuid())
+  userId       String
+  label        String
+  keyword      String
+  periodMonths Int
+  anchorDate   DateTime  @db.Date
+  amount       Decimal?  @db.Decimal(12, 2)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions ImportedTransaction[]
+  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions   ImportedTransaction[]
+  pendingMatches RecurringPendingMatch[]
 
   @@index([userId])
   @@index([userId, isActive])
+}
+
+model RecurringPendingMatch {
+  id            String   @id @default(cuid())
+  ruleId        String
+  transactionId String   @unique
+  score         Float
+  createdAt     DateTime @default(now())
+
+  rule        RecurringRule       @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  transaction ImportedTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([ruleId])
 }
 
 model ManualExpense {

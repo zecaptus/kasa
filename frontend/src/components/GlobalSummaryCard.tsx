@@ -5,6 +5,7 @@ import type { DashboardSummaryDto } from '../services/dashboardApi';
 interface Props {
   summary: DashboardSummaryDto;
   startingBalance: number;
+  endOfMonthPrediction?: number | null;
 }
 
 interface MetricProps {
@@ -42,13 +43,19 @@ function Metric({ labelId, value, highlightPositive = false }: MetricProps) {
   );
 }
 
-export function GlobalSummaryCard({ summary, startingBalance }: Props) {
+export function GlobalSummaryCard({ summary, startingBalance, endOfMonthPrediction }: Props) {
   const intl = useIntl();
+  const hasPrediction = endOfMonthPrediction !== null && endOfMonthPrediction !== undefined;
 
   return (
     <section aria-label={intl.formatMessage({ id: 'dashboard.title' })} className="card p-6">
       <h2 className="mb-4 section-title">{intl.formatMessage({ id: 'dashboard.title' })}</h2>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+      <div
+        className={cn('grid grid-cols-2 gap-4', {
+          'sm:grid-cols-3 lg:grid-cols-6': hasPrediction,
+          'sm:grid-cols-5': !hasPrediction,
+        })}
+      >
         <Metric labelId="dashboard.summary.startingBalance" value={startingBalance} />
         <Metric labelId="dashboard.summary.totalBalance" value={summary.totalBalance} />
         <Metric labelId="dashboard.summary.monthlyIncome" value={summary.monthlyIncome} />
@@ -58,6 +65,13 @@ export function GlobalSummaryCard({ summary, startingBalance }: Props) {
           value={summary.netCashFlow}
           highlightPositive
         />
+        {hasPrediction && (
+          <Metric
+            labelId="dashboard.summary.endOfMonthPrediction"
+            value={endOfMonthPrediction as number}
+            highlightPositive
+          />
+        )}
       </div>
     </section>
   );

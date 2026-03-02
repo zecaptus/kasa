@@ -26,6 +26,6 @@ export function useIsApiLoading(): boolean {
       hasActivePending(state.dashboardApi) ||
       hasActivePending(state.pocketsApi) ||
       hasActivePending(state.bankAccountsApi) ||
-      hasActivePending(state.recurringPatternsApi),
+      hasActivePending(state.recurringRulesApi),
   );
 }

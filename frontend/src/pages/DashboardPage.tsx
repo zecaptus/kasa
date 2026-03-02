@@ -4,10 +4,10 @@ import { AccountCard } from '../components/AccountCard';
 import { DashboardSkeleton } from '../components/DashboardSkeleton';
 import { DateRangePicker } from '../components/DateRangePicker';
 import { GlobalSummaryCard } from '../components/GlobalSummaryCard';
-import { RecurringPatternRow } from '../components/RecurringPatternRow';
+import { RecurringRuleRow } from '../components/RecurringRuleRow';
 import { useGetDashboardQuery } from '../services/dashboardApi';
 import { useListPocketsQuery } from '../services/pocketsApi';
-import { useListRecurringPatternsQuery } from '../services/recurringPatternsApi';
+import { useListRecurringRulesQuery } from '../services/recurringRulesApi';
 
 const LazySpendingChart = lazy(() => import('../components/SpendingChart'));
 
@@ -40,23 +40,20 @@ export function DashboardPage() {
 
   const { data, isLoading, isError, refetch } = useGetDashboardQuery({ from, to });
   const { data: pocketsData } = useListPocketsQuery();
-  const { data: recurringData } = useListRecurringPatternsQuery();
+  const { data: recurringData } = useListRecurringRulesQuery();
 
-  // Filter upcoming patterns within the selected range end
-  const rangeEnd = new Date(`${to}T23:59:59`);
   const now = new Date();
+  const startOfMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const endOfMonthStr = formatDate(new Date(now.getFullYear(), now.getMonth() + 1, 0));
 
-  const upcomingPatterns = (recurringData?.patterns ?? [])
-    .filter((p) => {
-      if (!p.isActive || !p.nextOccurrenceDate) return false;
-      const next = new Date(p.nextOccurrenceDate);
-      return next >= now && next <= rangeEnd;
-    })
-    .sort((a, b) => {
-      if (!a.nextOccurrenceDate) return 1;
-      if (!b.nextOccurrenceDate) return -1;
-      return a.nextOccurrenceDate.localeCompare(b.nextOccurrenceDate);
-    });
+  const upcomingRules = (recurringData?.rules ?? [])
+    .filter(
+      (r) =>
+        r.isActive &&
+        r.nextOccurrenceDate >= startOfMonthStr &&
+        r.nextOccurrenceDate <= endOfMonthStr,
+    )
+    .sort((a, b) => a.nextOccurrenceDate.localeCompare(b.nextOccurrenceDate));
 
   function handleRangeChange(newFrom: string, newTo: string) {
     setFrom(newFrom);
@@ -102,6 +99,14 @@ export function DashboardPage() {
         startingBalance={data.accounts
           .filter((a) => !a.isHidden)
           .reduce((sum, a) => sum + a.balanceAtRangeStart, 0)}
+        endOfMonthPrediction={(() => {
+          const visible = data.accounts.filter((a) => !a.isHidden);
+          if (!visible.some((a) => a.endOfMonthPrediction !== null)) return null;
+          return visible.reduce(
+            (sum, a) => sum + (a.endOfMonthPrediction ?? a.currentBalance ?? a.balance),
+            0,
+          );
+        })()}
       />
 
       {/* Per-account cards */}
@@ -115,7 +120,7 @@ export function DashboardPage() {
             <AccountCard
               key={account.accountId}
               account={account}
-              pockets={pocketsData?.pockets.filter((p) => p.accountLabel === account.label)}
+              pockets={pocketsData?.pockets.filter((p) => p.accountId === account.accountId)}
             />
           ))}
         </div>
@@ -131,14 +136,14 @@ export function DashboardPage() {
         <h2 className="mb-4 text-base font-semibold text-slate-800 dark:text-slate-100">
           {intl.formatMessage({ id: 'recurring.upcoming.title' })}
         </h2>
-        {upcomingPatterns.length === 0 ? (
+        {upcomingRules.length === 0 ? (
           <p className="text-sm text-slate-400">
             {intl.formatMessage({ id: 'recurring.upcoming.empty' })}
           </p>
         ) : (
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {upcomingPatterns.map((pattern) => (
-              <RecurringPatternRow key={pattern.id} pattern={pattern} />
+            {upcomingRules.map((rule) => (
+              <RecurringRuleRow key={rule.id} rule={rule} />
             ))}
           </ul>
         )}

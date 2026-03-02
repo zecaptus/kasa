@@ -2,15 +2,6 @@ import { Prisma, prisma } from '@kasa/db';
 
 // ─── DTOs ─────────────────────────────────────────────────────────────────────
 
-export interface RecentTransactionDto {
-  id: string;
-  date: string; // YYYY-MM-DD
-  label: string;
-  amount: number;
-  direction: 'debit' | 'credit';
-  transferPeerAccountLabel: string | null;
-}
-
 export interface AccountSummaryDto {
   accountId: string;
   label: string;
@@ -22,7 +13,6 @@ export interface AccountSummaryDto {
   currentBalance: number | null;
   balanceDate: string | null;
   endOfMonthPrediction: number | null;
-  recentTransactions: RecentTransactionDto[];
 }
 
 export interface DashboardSummaryDto {
@@ -88,21 +78,6 @@ interface AccountBalanceRow {
   last_known_balance: Prisma.Decimal | null;
   last_known_balance_date: Date | null;
   balance_delta: Prisma.Decimal | null;
-}
-
-interface RecentTxRow {
-  id: string;
-  date: Date;
-  label: string;
-  amount: Prisma.Decimal;
-  direction: string;
-  account_id: string;
-  transfer_peer_account_label: string | null;
-}
-
-interface PredictionRow {
-  account_id: string;
-  predicted_debit: Prisma.Decimal | null;
 }
 
 interface CategorySpendingRow {
@@ -245,31 +220,54 @@ export async function getGlobalSummary(
 
 // ─── getAccountPredictions ────────────────────────────────────────────────────
 
-async function getAccountPredictions(userId: string, rangeEnd: Date): Promise<Map<string, number>> {
+type RuleRow = {
+  amount: Prisma.Decimal | null;
+  periodMonths: number;
+  transactions: { accountingDate: Date; debit: Prisma.Decimal | null; accountId: string }[];
+};
+
+function ruleContribution(
+  rule: RuleRow,
+  today: Date,
+  endOfMonth: Date,
+): { accountId: string; amount: number } | null {
+  const lastTx = rule.transactions[0];
+  if (!lastTx) return null;
+
+  const d = new Date(lastTx.accountingDate);
+  while (d <= today) d.setMonth(d.getMonth() + rule.periodMonths);
+  if (d > endOfMonth) return null;
+
+  const amount = rule.amount !== null ? Number(rule.amount) : Number(lastTx.debit ?? 0);
+  if (amount <= 0) return null;
+
+  return { accountId: lastTx.accountId, amount };
+}
+
+async function getAccountPredictions(userId: string): Promise<Map<string, number>> {
   const now = new Date();
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const endOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
 
-  const rows = await prisma.$queryRaw<PredictionRow[]>(Prisma.sql`
-    SELECT last_tx.account_id, SUM(rp."amount") AS predicted_debit
-    FROM "RecurringPattern" rp
-    JOIN LATERAL (
-      SELECT it."accountId" AS account_id
-      FROM "ImportedTransaction" it
-      WHERE it."recurringPatternId" = rp.id
-      ORDER BY it."accountingDate" DESC
-      LIMIT 1
-    ) last_tx ON TRUE
-    WHERE rp."userId" = ${userId}
-      AND rp."isActive" = true
-      AND rp."nextOccurrenceDate" >= ${today}::date
-      AND rp."nextOccurrenceDate" <= ${rangeEnd}::date
-      AND rp."amount" IS NOT NULL
-    GROUP BY last_tx.account_id
-  `);
+  const rules = await prisma.recurringRule.findMany({
+    where: { userId, isActive: true },
+    select: {
+      amount: true,
+      periodMonths: true,
+      transactions: {
+        orderBy: { accountingDate: 'desc' },
+        take: 1,
+        select: { accountingDate: true, debit: true, accountId: true },
+      },
+    },
+  });
 
   const map = new Map<string, number>();
-  for (const row of rows) {
-    map.set(row.account_id, toNum(row.predicted_debit));
+  for (const rule of rules) {
+    const contrib = ruleContribution(rule, today, endOfMonth);
+    if (contrib) {
+      map.set(contrib.accountId, (map.get(contrib.accountId) ?? 0) + contrib.amount);
+    }
   }
   return map;
 }
@@ -280,7 +278,7 @@ export async function getAccountSummaries(
   userId: string,
   range: ResolvedRange,
 ): Promise<AccountSummaryDto[]> {
-  const [balanceRows, recentRows, predictionMap] = await Promise.all([
+  const [balanceRows, predictionMap] = await Promise.all([
     prisma.$queryRaw<AccountBalanceRow[]>(Prisma.sql`
       SELECT
         a.id                                                             AS account_id,
@@ -310,45 +308,8 @@ export async function getAccountSummaries(
       GROUP BY a.id, a."label", a."accountNumber", a."isHidden", a."lastKnownBalance", a."lastKnownBalanceDate"
       ORDER BY a."label"
     `),
-    prisma.$queryRaw<RecentTxRow[]>(Prisma.sql`
-      SELECT *
-      FROM (
-        SELECT
-          t.id,
-          t."accountingDate"                                               AS date,
-          t.label,
-          COALESCE(t."debit", t."credit", 0)                              AS amount,
-          CASE WHEN t."debit" IS NOT NULL THEN 'debit' ELSE 'credit' END  AS direction,
-          t."accountId"                                                   AS account_id,
-          peer_acc."label"                                                AS transfer_peer_account_label,
-          ROW_NUMBER() OVER (PARTITION BY t."accountId" ORDER BY t."accountingDate" DESC, t.id ASC) AS rn
-        FROM "ImportedTransaction" t
-        JOIN "Account" a ON a.id = t."accountId"
-        LEFT JOIN "ImportedTransaction" peer_tx ON peer_tx.id = t."transferPeerId"
-        LEFT JOIN "Account" peer_acc ON peer_acc.id = peer_tx."accountId"
-        WHERE a."ownerId" = ${userId}
-           OR EXISTS (SELECT 1 FROM "AccountViewer" av WHERE av."accountId" = a.id AND av."userId" = ${userId})
-      ) ranked
-      WHERE rn <= 5
-      ORDER BY account_id, date DESC
-    `),
-    getAccountPredictions(userId, range.end),
+    getAccountPredictions(userId),
   ]);
-
-  // Group recent rows by accountId
-  const recentById = new Map<string, RecentTransactionDto[]>();
-  for (const r of recentRows) {
-    const list = recentById.get(r.account_id) ?? [];
-    list.push({
-      id: r.id,
-      date: r.date.toISOString().split('T')[0] as string,
-      label: r.label,
-      amount: toNum(r.amount),
-      direction: r.direction as 'debit' | 'credit',
-      transferPeerAccountLabel: r.transfer_peer_account_label,
-    });
-    recentById.set(r.account_id, list);
-  }
 
   return balanceRows.map((row) => {
     const currentBalance =
@@ -376,7 +337,6 @@ export async function getAccountSummaries(
       currentBalance,
       balanceDate: balanceDate as string | null,
       endOfMonthPrediction,
-      recentTransactions: recentById.get(row.account_id) ?? [],
     };
   });
 }

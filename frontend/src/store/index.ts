@@ -4,7 +4,7 @@ import { bankAccountsApi } from '../services/bankAccountsApi';
 import { dashboardApi } from '../services/dashboardApi';
 import { importApi } from '../services/importApi';
 import { pocketsApi } from '../services/pocketsApi';
-import { recurringPatternsApi } from '../services/recurringPatternsApi';
+import { recurringRulesApi } from '../services/recurringRulesApi';
 import { transactionsApi } from '../services/transactionsApi';
 import authReducer from './authSlice';
 import importReducer from './importSlice';
@@ -21,7 +21,7 @@ export const store = configureStore({
     [dashboardApi.reducerPath]: dashboardApi.reducer,
     [pocketsApi.reducerPath]: pocketsApi.reducer,
     [bankAccountsApi.reducerPath]: bankAccountsApi.reducer,
-    [recurringPatternsApi.reducerPath]: recurringPatternsApi.reducer,
+    [recurringRulesApi.reducerPath]: recurringRulesApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(
@@ -31,7 +31,7 @@ export const store = configureStore({
       dashboardApi.middleware,
       pocketsApi.middleware,
       bankAccountsApi.middleware,
-      recurringPatternsApi.middleware,
+      recurringRulesApi.middleware,
     ),
 });
 

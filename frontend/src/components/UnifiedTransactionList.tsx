@@ -82,7 +82,7 @@ function TransactionBadges({ tx }: { tx: UnifiedTransactionDto }) {
       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
         {intl.formatMessage({ id: sourceId })}
       </span>
-      {tx.recurringPatternId !== null && (
+      {tx.recurringRuleId !== null && (
         <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
           {intl.formatMessage({ id: 'recurring.badge' })}
         </span>
