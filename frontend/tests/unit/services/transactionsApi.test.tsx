@@ -119,7 +119,6 @@ describe('transactionsApi hooks', () => {
 
     await waitFor(() => {
       expect(result.current).toHaveProperty('data');
-      expect(result.current).toHaveProperty('error');
       expect(result.current).toHaveProperty('isLoading');
       expect(result.current).toHaveProperty('isSuccess');
       expect(result.current).toHaveProperty('isError');

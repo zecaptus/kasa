@@ -4,6 +4,7 @@ import { bankAccountsApi } from '../services/bankAccountsApi';
 import { dashboardApi } from '../services/dashboardApi';
 import { importApi } from '../services/importApi';
 import { pocketsApi } from '../services/pocketsApi';
+import { recurringPatternsApi } from '../services/recurringPatternsApi';
 import { recurringRulesApi } from '../services/recurringRulesApi';
 import { transactionsApi } from '../services/transactionsApi';
 import authReducer from './authSlice';
@@ -22,9 +23,10 @@ export const store = configureStore({
     [pocketsApi.reducerPath]: pocketsApi.reducer,
     [bankAccountsApi.reducerPath]: bankAccountsApi.reducer,
     [recurringRulesApi.reducerPath]: recurringRulesApi.reducer,
+    [recurringPatternsApi.reducerPath]: recurringPatternsApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(
+    getDefaultMiddleware({ serializableCheck: { warnAfter: 128 } }).concat(
       authApi.middleware,
       importApi.middleware,
       transactionsApi.middleware,
@@ -32,6 +34,7 @@ export const store = configureStore({
       pocketsApi.middleware,
       bankAccountsApi.middleware,
       recurringRulesApi.middleware,
+      recurringPatternsApi.middleware,
     ),
 });
 
