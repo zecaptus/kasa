@@ -24,10 +24,10 @@ const mockData: DashboardResponseDto = {
       isHidden: false,
       balance: 1250.5,
       rangeVariation: 200,
+      balanceAtRangeStart: 1050.5,
       currentBalance: null,
       balanceDate: null,
       endOfMonthPrediction: null,
-      recentTransactions: [],
     },
   ],
   categoryComparison: {
@@ -41,6 +41,14 @@ vi.mock('../../../src/services/dashboardApi', async (importOriginal) => {
   return {
     ...actual,
     useGetDashboardQuery: vi.fn(),
+  };
+});
+
+vi.mock('../../../src/services/pocketsApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/services/pocketsApi')>();
+  return {
+    ...actual,
+    useListPocketsQuery: () => ({ data: { pockets: [] }, isLoading: false }),
   };
 });
 

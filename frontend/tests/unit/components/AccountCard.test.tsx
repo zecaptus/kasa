@@ -34,27 +34,10 @@ const baseAccount: AccountSummaryDto = {
   isHidden: false,
   balance: 1250.5,
   rangeVariation: 200,
+  balanceAtRangeStart: 1050.5,
   currentBalance: null,
   balanceDate: null,
   endOfMonthPrediction: null,
-  recentTransactions: [
-    {
-      id: 'tx1',
-      date: '2026-02-20',
-      label: 'CB MONOPRIX',
-      amount: 45.3,
-      direction: 'debit',
-      transferPeerAccountLabel: null,
-    },
-    {
-      id: 'tx2',
-      date: '2026-02-18',
-      label: 'VIREMENT SALAIRE',
-      amount: 2800,
-      direction: 'credit',
-      transferPeerAccountLabel: null,
-    },
-  ],
 };
 
 describe('AccountCard', () => {
@@ -82,17 +65,6 @@ describe('AccountCard', () => {
     renderCard({ ...baseAccount, balance: -50 });
     const redEl = document.querySelector('.text-red-500');
     expect(redEl).toBeTruthy();
-  });
-
-  it('renders recent transactions list', () => {
-    renderCard(baseAccount);
-    expect(screen.getByText('CB MONOPRIX')).toBeDefined();
-    expect(screen.getByText('VIREMENT SALAIRE')).toBeDefined();
-  });
-
-  it('shows empty state when recentTransactions is empty', () => {
-    renderCard({ ...baseAccount, recentTransactions: [] });
-    expect(screen.getByText('No recent transactions')).toBeDefined();
   });
 
   it('clicking rename button shows rename input', () => {
@@ -146,40 +118,6 @@ describe('AccountCard', () => {
     renderCard({ ...baseAccount, isHidden: true });
     const article = document.querySelector('article');
     expect(article?.className).toContain('opacity-40');
-  });
-
-  it('renders transferPeerAccountLabel on debit transactions', () => {
-    renderCard({
-      ...baseAccount,
-      recentTransactions: [
-        {
-          id: 'tx3',
-          date: '2026-02-10',
-          label: 'VIREMENT',
-          amount: 100,
-          direction: 'debit',
-          transferPeerAccountLabel: 'Livret A',
-        },
-      ],
-    });
-    expect(screen.getByText(/→ Livret A/)).toBeDefined();
-  });
-
-  it('renders transferPeerAccountLabel on credit transactions', () => {
-    renderCard({
-      ...baseAccount,
-      recentTransactions: [
-        {
-          id: 'tx4',
-          date: '2026-02-10',
-          label: 'VIREMENT',
-          amount: 100,
-          direction: 'credit',
-          transferPeerAccountLabel: 'Compte courant',
-        },
-      ],
-    });
-    expect(screen.getByText(/← Compte courant/)).toBeDefined();
   });
 
   it('renders pocket cards when pockets are provided', () => {

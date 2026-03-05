@@ -11,7 +11,7 @@ import { aiCategorizeBatch } from './aiCategorization.service.js';
 import { bulkCategorizeTransactions } from './categorization.service.js';
 import { parseSgCsv } from './csvParser.service.js';
 import { runReconciliation } from './reconciliation.service.js';
-import { detectRecurringPatterns } from './recurringPatterns.service.js';
+import { matchTransactionsToRules } from './recurringRules.service.js';
 import { detectTransferPairs } from './transferDetection.service.js';
 import { applyTransferLabelRules } from './transferLabels.service.js';
 
@@ -216,8 +216,8 @@ export async function importCsv(
     }
   }
 
-  // Detect recurring patterns after import
-  await detectRecurringPatterns(userId);
+  // Match transactions to existing recurring rules after import
+  await matchTransactionsToRules(userId);
 
   // Detect internal transfer pairs (VIR EMIS ↔ VIR RECU across accounts)
   await detectTransferPairs(userId);

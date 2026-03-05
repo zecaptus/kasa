@@ -1,5 +1,6 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { baseQueryWithReauth } from './baseQueryWithReauth';
+import { dashboardApi } from './dashboardApi';
 
 // ─── DTOs ─────────────────────────────────────────────────────────────────────
 
@@ -51,7 +52,7 @@ export interface UnifiedTransactionDto {
   categoryId: string | null;
   categorySource: CategorySource;
   category: CategoryDto | null;
-  recurringPatternId: string | null;
+  recurringRuleId: string | null;
   transferPeerId: string | null;
   transferPeerAccountLabel: string | null;
   transferLabel: string | null;
@@ -80,6 +81,7 @@ export interface ListTransactionsParams {
   search?: string;
   accountId?: string;
   transferLabel?: string;
+  recurring?: boolean;
 }
 
 export interface RuleSuggestionDto {
@@ -109,6 +111,7 @@ export function buildTransactionParams(p: ListTransactionsParams): Record<string
   if (p.search) params.search = p.search;
   if (p.accountId) params.accountId = p.accountId;
   if (p.transferLabel) params.transferLabel = p.transferLabel;
+  if (p.recurring) params.recurring = true;
   return params;
 }
 
@@ -142,16 +145,20 @@ export const transactionsApi = createApi({
         body: { categoryId },
       }),
       invalidatesTags: ['Transaction'],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        await queryFulfilled;
+        dispatch(dashboardApi.util.invalidateTags(['Dashboard']));
+      },
     }),
 
     updateTransactionRecurring: builder.mutation<
       UnifiedTransactionDto,
-      { id: string; recurringPatternId: string | null }
+      { id: string; recurringRuleId: string | null }
     >({
-      query: ({ id, recurringPatternId }) => ({
+      query: ({ id, recurringRuleId }) => ({
         url: `/transactions/${id}/recurring`,
         method: 'PATCH',
-        body: { recurringPatternId },
+        body: { recurringRuleId },
       }),
       invalidatesTags: ['Transaction'],
     }),
@@ -227,6 +234,10 @@ export const transactionsApi = createApi({
     recategorizeAll: builder.mutation<{ categorized: number }, void>({
       query: () => ({ url: '/categories/recategorize-all', method: 'POST' }),
       invalidatesTags: ['Transaction', 'CategoryRule'],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        await queryFulfilled;
+        dispatch(dashboardApi.util.invalidateTags(['Dashboard']));
+      },
     }),
 
     listRuleSuggestions: builder.query<{ suggestions: RuleSuggestionDto[] }, void>({
@@ -267,6 +278,10 @@ export const transactionsApi = createApi({
     >({
       query: () => ({ url: '/categories/ai-categorize', method: 'POST' }),
       invalidatesTags: ['Transaction', 'CategoryRule'],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        await queryFulfilled;
+        dispatch(dashboardApi.util.invalidateTags(['Dashboard']));
+      },
     }),
 
     listTransferLabelRules: builder.query<{ rules: TransferLabelRuleDto[] }, void>({

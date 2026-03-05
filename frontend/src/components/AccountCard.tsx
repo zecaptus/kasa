@@ -277,53 +277,6 @@ export function AccountCard({ account, pockets }: Props) {
       {/* Balance */}
       <BalanceDisplay account={account} />
 
-      {/* Recent transactions */}
-      <div>
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">
-          {intl.formatMessage({ id: 'dashboard.account.recentTitle' })}
-        </p>
-        {account.recentTransactions.length === 0 ? (
-          <p className="text-sm text-slate-400">
-            {intl.formatMessage({ id: 'dashboard.account.noTransactions' })}
-          </p>
-        ) : (
-          <ul className="space-y-1">
-            {account.recentTransactions.map((tx) => {
-              const txAmount = intl.formatNumber(tx.amount, {
-                style: 'currency',
-                currency: 'EUR',
-                minimumFractionDigits: 2,
-              });
-              return (
-                <li key={tx.id} className="flex items-center justify-between gap-2 text-sm">
-                  <div className="min-w-0">
-                    <span className="block truncate text-slate-600 dark:text-slate-300">
-                      {tx.label}
-                    </span>
-                    {tx.transferPeerAccountLabel !== null && (
-                      <span className="text-xs text-violet-600 dark:text-violet-400">
-                        {tx.direction === 'debit'
-                          ? `→ ${tx.transferPeerAccountLabel}`
-                          : `← ${tx.transferPeerAccountLabel}`}
-                      </span>
-                    )}
-                  </div>
-                  <span
-                    className={cn('shrink-0 tabular-nums', {
-                      'text-red-500': tx.direction === 'debit',
-                      'text-emerald-600': tx.direction === 'credit',
-                    })}
-                  >
-                    {tx.direction === 'debit' ? '-' : '+'}
-                    {txAmount}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-
       {/* Nested pocket cards */}
       {pockets && pockets.length > 0 && (
         <div className="mt-4 space-y-2">

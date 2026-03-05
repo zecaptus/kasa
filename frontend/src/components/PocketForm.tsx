@@ -18,7 +18,7 @@ interface Props {
 function validatePocketForm(
   name: string,
   goalAmount: string,
-  accountLabel: string,
+  accountId: string,
   isEdit: boolean,
   formatMessage: (d: { id: string }) => string,
 ): Record<string, string> {
@@ -29,22 +29,22 @@ function validatePocketForm(
     errs.goalAmount = formatMessage({ id: 'pockets.goal' });
   }
   // accountLabel can be "" (transactions imported before label feature) — only error when undefined
-  if (accountLabel === undefined && !isEdit)
+  if (accountId === undefined && !isEdit)
     errs.accountLabel = formatMessage({ id: 'pockets.account' });
   return errs;
 }
 
 function usePocketFormState(
   initialValues: PocketSummaryDto | undefined,
-  accounts: { label: string }[],
+  accounts: { accountId: string }[],
 ) {
   const [name, setName] = useState(initialValues?.name ?? '');
   const [goalAmount, setGoalAmount] = useState(
     initialValues ? String(initialValues.goalAmount) : '',
   );
   const [color, setColor] = useState(initialValues?.color ?? PALETTE[0] ?? '#22c55e');
-  const [accountLabel, setAccountLabel] = useState(
-    initialValues?.accountLabel ?? accounts[0]?.label ?? '',
+  const [accountId, setAccountId] = useState(
+    initialValues?.accountId ?? accounts[0]?.accountId ?? '',
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
   return {
@@ -54,8 +54,8 @@ function usePocketFormState(
     setGoalAmount,
     color,
     setColor,
-    accountLabel,
-    setAccountLabel,
+    accountId,
+    setAccountId,
     errors,
     setErrors,
   };
@@ -78,8 +78,8 @@ export function PocketForm({ initialValues, onSuccess, onCancel }: Props) {
     setGoalAmount,
     color,
     setColor,
-    accountLabel,
-    setAccountLabel,
+    accountId,
+    setAccountId,
     errors,
     setErrors,
   } = usePocketFormState(initialValues, accounts);
@@ -87,10 +87,10 @@ export function PocketForm({ initialValues, onSuccess, onCancel }: Props) {
   // Sync selection to first account once dashboard data loads (accounts is [] on first render)
   // accountLabel may be "" which is falsy but is a valid value, so check accounts.length instead
   useEffect(() => {
-    if (!isEdit && accounts.length > 0 && accountLabel === '') {
-      setAccountLabel(accounts[0]?.label ?? '');
+    if (!isEdit && accounts.length > 0 && accountId === '') {
+      setAccountId(accounts[0]?.accountId ?? '');
     }
-  }, [accounts, accountLabel, isEdit, setAccountLabel]);
+  }, [accounts, accountId, isEdit, setAccountId]);
 
   const [createPocket, { isLoading: isCreating }] = useCreatePocketMutation();
   const [updatePocket, { isLoading: isUpdating }] = useUpdatePocketMutation();
@@ -106,7 +106,7 @@ export function PocketForm({ initialValues, onSuccess, onCancel }: Props) {
       }).unwrap();
     } else {
       await createPocket({
-        accountLabel,
+        accountId,
         name: name.trim(),
         goalAmount: parseFloat(goalAmount),
         color,
@@ -116,7 +116,7 @@ export function PocketForm({ initialValues, onSuccess, onCancel }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const errs = validatePocketForm(name, goalAmount, accountLabel, isEdit, intl.formatMessage);
+    const errs = validatePocketForm(name, goalAmount, accountId, isEdit, intl.formatMessage);
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
     try {
@@ -145,12 +145,12 @@ export function PocketForm({ initialValues, onSuccess, onCancel }: Props) {
           ) : (
             <select
               id="pocket-account"
-              value={accountLabel}
-              onChange={(e) => setAccountLabel(e.target.value)}
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
               className={inputCls()}
             >
               {accounts.map((a) => (
-                <option key={a.label} value={a.label}>
+                <option key={a.label} value={a.accountId}>
                   {a.label || intl.formatMessage({ id: 'dashboard.account.default' })}
                 </option>
               ))}

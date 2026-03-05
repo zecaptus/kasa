@@ -6,6 +6,11 @@ import { TransactionDetail } from '../components/TransactionDetail';
 import { TransactionFilters } from '../components/TransactionFilters';
 import { UnifiedTransactionList } from '../components/UnifiedTransactionList';
 import {
+  useConfirmPendingMatchMutation,
+  useDismissPendingMatchMutation,
+  useListPendingMatchesQuery,
+} from '../services/recurringRulesApi';
+import {
   type ListTransactionsParams,
   transactionsApi,
   type UnifiedTransactionDto,
@@ -27,14 +32,22 @@ function buildParams(filters: Filters, cursor: string | undefined): ListTransact
   if (filters.search) p.search = filters.search;
   if (filters.accountId) p.accountId = filters.accountId;
   if (filters.transferLabel) p.transferLabel = filters.transferLabel;
+  if (filters.recurring) p.recurring = filters.recurring;
   if (cursor) p.cursor = cursor;
   return p;
 }
 
 function filtersKey(f: Filters): string {
-  return [f.from, f.to, f.categoryId, f.direction, f.search, f.accountId, f.transferLabel].join(
-    '|',
-  );
+  return [
+    f.from,
+    f.to,
+    f.categoryId,
+    f.direction,
+    f.search,
+    f.accountId,
+    f.transferLabel,
+    f.recurring,
+  ].join('|');
 }
 
 // ─── AddButton ────────────────────────────────────────────────────────────────
@@ -93,6 +106,65 @@ function ExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
         <ExpenseForm onSuccess={onSuccess} />
       </div>
     </>
+  );
+}
+
+// ─── PendingMatchesBanner ────────────────────────────────────────────────────
+
+function PendingMatchesBanner() {
+  const intl = useIntl();
+  const { data } = useListPendingMatchesQuery();
+  const [confirm] = useConfirmPendingMatchMutation();
+  const [dismiss] = useDismissPendingMatchMutation();
+  const [expanded, setExpanded] = useState(false);
+
+  const matches = data?.matches ?? [];
+  if (matches.length === 0) return null;
+
+  return (
+    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+          {intl.formatMessage({ id: 'recurring.pending.banner' }, { count: matches.length })}
+        </p>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="rounded-lg px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900"
+        >
+          {intl.formatMessage({ id: 'recurring.pending.review' })}
+        </button>
+      </div>
+      {expanded && (
+        <ul className="mt-2 space-y-2">
+          {matches.map((m) => (
+            <li key={m.id} className="flex items-center justify-between gap-2 text-xs">
+              <span className="min-w-0 truncate text-slate-700 dark:text-slate-300">
+                <span className="font-medium">{m.transactionLabel}</span>
+                {' → '}
+                <span className="text-amber-700 dark:text-amber-400">{m.ruleLabel}</span>
+              </span>
+              <div className="flex shrink-0 gap-1">
+                <button
+                  type="button"
+                  onClick={() => confirm(m.id)}
+                  className="rounded px-2 py-0.5 font-semibold text-green-700 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900"
+                >
+                  {intl.formatMessage({ id: 'recurring.pending.confirm' })}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => dismiss(m.id)}
+                  className="rounded px-2 py-0.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                >
+                  {intl.formatMessage({ id: 'recurring.pending.dismiss' })}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -175,6 +247,9 @@ export function TransactionsPage() {
           <AddButton onClick={() => setShowForm(true)} />
         </div>
       </div>
+
+      {/* Pending recurring matches */}
+      <PendingMatchesBanner />
 
       {/* Filters */}
       <div className="mb-4">

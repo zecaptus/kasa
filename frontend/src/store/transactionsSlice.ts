@@ -8,6 +8,7 @@ export interface TransactionFilters {
   search: string;
   accountId: string | undefined;
   transferLabel: string | undefined;
+  recurring: boolean | undefined;
 }
 
 export interface TransactionsState {
@@ -23,6 +24,7 @@ const initialState: TransactionsState = {
     search: '',
     accountId: undefined,
     transferLabel: undefined,
+    recurring: undefined,
   },
 };
 

@@ -37,7 +37,7 @@ function CreatePatternForm({ transactionId, onDone }: CreatePatternFormProps) {
         keyword: keyword.trim(),
         frequency,
       }).unwrap();
-      await linkRecurring({ id: transactionId, recurringPatternId: pattern.id }).unwrap();
+      await linkRecurring({ id: transactionId, recurringRuleId: pattern.id }).unwrap();
       onDone();
     } finally {
       setSaving(false);
@@ -109,7 +109,7 @@ export function RecurringPatternPicker({
       return;
     }
     setShowCreate(false);
-    await linkRecurring({ id: transactionId, recurringPatternId: value || null });
+    await linkRecurring({ id: transactionId, recurringRuleId: value || null });
   }
 
   const selectValue = showCreate ? CREATE_SENTINEL : (currentPatternId ?? '');

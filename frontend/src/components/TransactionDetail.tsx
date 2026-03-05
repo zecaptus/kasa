@@ -1,15 +1,12 @@
 import { useIntl } from 'react-intl';
 import { cn } from '../lib/cn';
-import {
-  type RecurringPatternDto,
-  useListRecurringPatternsQuery,
-} from '../services/recurringPatternsApi';
+import { type RecurringRuleDto, useListRecurringRulesQuery } from '../services/recurringRulesApi';
 import {
   type UnifiedTransactionDto,
   useUpdateTransactionCategoryMutation,
 } from '../services/transactionsApi';
 import { CategoryPicker } from './CategoryPicker';
-import { RecurringPatternPicker } from './RecurringPatternPicker';
+import { RecurringRulePicker } from './RecurringRulePicker';
 import { TransferLabelEditor } from './TransferLabelEditor';
 import { TransferPeerPicker } from './TransferPeerPicker';
 
@@ -40,10 +37,10 @@ function CategorySourceNote({ source }: { source: string }) {
 
 function ImportedTransactionFields({
   transaction,
-  patterns,
+  rules,
 }: {
   transaction: UnifiedTransactionDto;
-  patterns: RecurringPatternDto[];
+  rules: RecurringRuleDto[];
 }) {
   const intl = useIntl();
   return (
@@ -54,10 +51,11 @@ function ImportedTransactionFields({
         <span className="text-sm text-slate-500">
           {intl.formatMessage({ id: 'recurring.link.title' })}
         </span>
-        <RecurringPatternPicker
+        <RecurringRulePicker
           transactionId={transaction.id}
-          currentPatternId={transaction.recurringPatternId}
-          patterns={patterns}
+          transactionLabel={transaction.label}
+          currentRuleId={transaction.recurringRuleId}
+          rules={rules}
         />
       </div>
     </>
@@ -67,7 +65,7 @@ function ImportedTransactionFields({
 export function TransactionDetail({ transaction, onClose }: TransactionDetailProps) {
   const intl = useIntl();
   const [updateCategory, { isLoading }] = useUpdateTransactionCategoryMutation();
-  const { data: recurringData } = useListRecurringPatternsQuery();
+  const { data: recurringData } = useListRecurringRulesQuery();
 
   if (transaction === null) {
     return null;
@@ -183,7 +181,7 @@ export function TransactionDetail({ transaction, onClose }: TransactionDetailPro
           {transaction.type === 'IMPORTED_TRANSACTION' && (
             <ImportedTransactionFields
               transaction={transaction}
-              patterns={recurringData?.patterns ?? []}
+              rules={recurringData?.rules ?? []}
             />
           )}
         </div>

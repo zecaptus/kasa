@@ -25,7 +25,7 @@ export interface UnifiedTransaction {
   categoryId: string | null;
   categorySource: CategorySource;
   category: CategoryInfo | null;
-  recurringPatternId: string | null;
+  recurringRuleId: string | null;
   transferPeerId: string | null;
   transferPeerAccountLabel: string | null;
   transferLabel: string | null;
@@ -48,6 +48,7 @@ export interface ListTimelineOptions {
   search: string | undefined;
   accountId: string | undefined;
   transferLabel: string | undefined;
+  recurring: boolean | undefined;
 }
 
 export interface TimelineTotals {
@@ -72,7 +73,7 @@ interface UnifiedRow {
   cat_slug: string | null;
   cat_color: string | null;
   cat_is_system: boolean | null;
-  recurring_pattern_id: string | null;
+  recurring_rule_id: string | null;
   transfer_peer_id: string | null;
   transfer_peer_account_label: string | null;
   transfer_label: string | null;
@@ -154,6 +155,17 @@ function buildItTransferLabelClause(transferLabel: string | undefined): Prisma.S
   return Prisma.empty;
 }
 
+function buildRecurringClauses(recurring: boolean | undefined): {
+  itRecurringClause: Prisma.Sql;
+  meRecurringGuard: Prisma.Sql;
+} {
+  if (!recurring) return { itRecurringClause: Prisma.empty, meRecurringGuard: Prisma.empty };
+  return {
+    itRecurringClause: Prisma.sql`AND it."recurringRuleId" IS NOT NULL`,
+    meRecurringGuard: Prisma.sql`AND FALSE`,
+  };
+}
+
 interface FilterClauses {
   itFromClause: Prisma.Sql;
   itToClause: Prisma.Sql;
@@ -168,6 +180,8 @@ interface FilterClauses {
   itAccountClause: Prisma.Sql;
   meAccountGuard: Prisma.Sql;
   itTransferLabelClause: Prisma.Sql;
+  itRecurringClause: Prisma.Sql;
+  meRecurringGuard: Prisma.Sql;
 }
 
 function buildFilterClauses(options: ListTimelineOptions): FilterClauses {
@@ -199,6 +213,7 @@ function buildFilterClauses(options: ListTimelineOptions): FilterClauses {
       : Prisma.empty,
     meAccountGuard: options.accountId ? Prisma.sql`AND FALSE` : Prisma.empty,
     itTransferLabelClause: buildItTransferLabelClause(options.transferLabel),
+    ...buildRecurringClauses(options.recurring),
   };
 }
 
@@ -228,7 +243,7 @@ export async function listTimeline(
       c."slug"                                      AS "cat_slug",
       c."color"                                     AS "cat_color",
       c."isSystem"                                  AS "cat_is_system",
-      it."recurringPatternId"                       AS "recurring_pattern_id",
+      it."recurringRuleId"                          AS "recurring_rule_id",
       it."transferPeerId"                           AS "transfer_peer_id",
       peer_acc."label"                              AS "transfer_peer_account_label",
       it."transferLabel"                            AS "transfer_label",
@@ -248,6 +263,7 @@ export async function listTimeline(
       ${f.itCategoryClause}
       ${f.itAccountClause}
       ${f.itTransferLabelClause}
+      ${f.itRecurringClause}
 
     UNION ALL
 
@@ -266,7 +282,7 @@ export async function listTimeline(
       c."slug"                                      AS "cat_slug",
       c."color"                                     AS "cat_color",
       c."isSystem"                                  AS "cat_is_system",
-      NULL::text                                    AS "recurring_pattern_id",
+      NULL::text                                    AS "recurring_rule_id",
       NULL::text                                    AS "transfer_peer_id",
       NULL::text                                    AS "transfer_peer_account_label",
       NULL::text                                    AS "transfer_label",
@@ -282,6 +298,7 @@ export async function listTimeline(
       ${f.meSearchClause}
       ${f.meCategoryClause}
       ${f.meAccountGuard}
+      ${f.meRecurringGuard}
 
     ORDER BY "date" DESC, "id" ASC
     LIMIT ${take}
@@ -319,7 +336,7 @@ export async function listTimeline(
             isSystem: row.cat_is_system ?? false,
           }
         : null,
-    recurringPatternId: row.recurring_pattern_id,
+    recurringRuleId: row.recurring_rule_id,
     transferPeerId: row.transfer_peer_id,
     transferPeerAccountLabel: row.transfer_peer_account_label,
     transferLabel: row.transfer_label ?? null,
@@ -357,6 +374,7 @@ async function getTimelineTotals(
         ${f.itSearchClause}
         ${f.itCategoryClause}
         ${f.itAccountClause}
+        ${f.itRecurringClause}
 
       UNION ALL
 
@@ -369,6 +387,7 @@ async function getTimelineTotals(
         ${f.meSearchClause}
         ${f.meCategoryClause}
         ${f.meAccountGuard}
+        ${f.meRecurringGuard}
     ) src
   `;
 
@@ -411,7 +430,7 @@ export async function getTransactionById(
             isSystem: it.category.isSystem,
           }
         : null,
-      recurringPatternId: it.recurringPatternId,
+      recurringRuleId: it.recurringRuleId,
       transferPeerId: it.transferPeerId,
       transferPeerAccountLabel: it.transferPeer?.account.label ?? null,
       transferLabel: it.transferLabel,
@@ -446,7 +465,7 @@ export async function getTransactionById(
             isSystem: me.category.isSystem,
           }
         : null,
-      recurringPatternId: null,
+      recurringRuleId: null,
       transferPeerId: null,
       transferPeerAccountLabel: null,
       transferLabel: null,
@@ -463,23 +482,23 @@ export async function getTransactionById(
 export async function updateTransactionRecurring(
   userId: string,
   id: string,
-  recurringPatternId: string | null,
+  recurringRuleId: string | null,
 ): Promise<UnifiedTransaction | null> {
-  // Only ImportedTransaction supports recurringPatternId
+  // Only ImportedTransaction supports recurringRuleId
   const it = await prisma.importedTransaction.findFirst({ where: { id, userId } });
   if (!it) return null;
 
-  // Verify the pattern belongs to the user (if not null)
-  if (recurringPatternId !== null) {
-    const pattern = await prisma.recurringPattern.findFirst({
-      where: { id: recurringPatternId, userId },
+  // Verify the rule belongs to the user (if not null)
+  if (recurringRuleId !== null) {
+    const rule = await prisma.recurringRule.findFirst({
+      where: { id: recurringRuleId, userId },
     });
-    if (!pattern) return null;
+    if (!rule) return null;
   }
 
   await prisma.importedTransaction.update({
     where: { id },
-    data: { recurringPatternId },
+    data: { recurringRuleId },
   });
   return getTransactionById(userId, id);
 }

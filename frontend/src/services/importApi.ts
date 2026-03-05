@@ -1,5 +1,7 @@
 import { createApi } from '@reduxjs/toolkit/query/react';
 import { baseQueryWithReauth } from './baseQueryWithReauth';
+import { dashboardApi } from './dashboardApi';
+import { transactionsApi } from './transactionsApi';
 
 // ─── DTOs ─────────────────────────────────────────────────────────────────────
 
@@ -110,6 +112,11 @@ export const importApi = createApi({
         body: formData,
       }),
       invalidatesTags: ['ImportSession'],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        await queryFulfilled;
+        dispatch(transactionsApi.util.invalidateTags(['Transaction']));
+        dispatch(dashboardApi.util.invalidateTags(['Dashboard']));
+      },
     }),
 
     getSessions: builder.query<SessionsResponse, { limit?: number; cursor?: string }>({
@@ -164,6 +171,11 @@ export const importApi = createApi({
         body,
       }),
       invalidatesTags: ['ManualExpense', 'ImportSession', 'ImportedTransaction'],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        await queryFulfilled;
+        dispatch(transactionsApi.util.invalidateTags(['Transaction']));
+        dispatch(dashboardApi.util.invalidateTags(['Dashboard']));
+      },
     }),
 
     deleteExpense: builder.mutation<void, string>({
@@ -172,6 +184,11 @@ export const importApi = createApi({
         method: 'DELETE',
       }),
       invalidatesTags: ['ManualExpense', 'ImportSession', 'ImportedTransaction'],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        await queryFulfilled;
+        dispatch(transactionsApi.util.invalidateTags(['Transaction']));
+        dispatch(dashboardApi.util.invalidateTags(['Dashboard']));
+      },
     }),
 
     confirmReconciliation: builder.mutation<

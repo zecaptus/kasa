@@ -115,7 +115,7 @@ describe('RecurringPatternPicker', () => {
     fireEvent.change(select, { target: { value: 'pattern-001' } });
     expect(mockLinkRecurring).toHaveBeenCalledWith({
       id: 'tx-001',
-      recurringPatternId: 'pattern-001',
+      recurringRuleId: 'pattern-001',
     });
   });
 
@@ -126,7 +126,7 @@ describe('RecurringPatternPicker', () => {
     fireEvent.change(select, { target: { value: '' } });
     expect(mockLinkRecurring).toHaveBeenCalledWith({
       id: 'tx-001',
-      recurringPatternId: null,
+      recurringRuleId: null,
     });
   });
 
